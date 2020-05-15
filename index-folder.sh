@@ -64,7 +64,7 @@ function main()
     mkdir -p "index"
     pushd "index" > /dev/null
 
-    #index_folder
+    index_folder
 
     popd >/dev/null
     popd >/dev/null
