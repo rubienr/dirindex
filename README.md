@@ -6,6 +6,7 @@ It should help to consolidate same named files if they differ.
 **Non aim:** 
 * it is not fully automated yet
 * it is not consolidation tool but rather an assistent
+* it is not the fastest tool: 20k files on SSD take about 6 minutes
 
 ## Usage
 

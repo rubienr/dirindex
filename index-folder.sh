@@ -21,6 +21,29 @@ function index_folder()
 }
 
 
+function sanity_check() 
+{
+     # check configuration
+    
+     num_dirs="${#FOLDER_TO_INDEX[@]}"
+     num_indices="${#FOLDER_INDEX_FILE[@]}"
+     if [ $num_dirs -ne $num_indices ] ; then
+         echo "failed to read configuration: number of directories ($num_dirs) do not match number of indices ($num_indices)"
+         exit -1
+     fi
+    
+    # check if folder are available
+    
+     for f in "${!FOLDER_TO_INDEX[@]}" ; do
+        folder=${FOLDER_TO_INDEX[$f]}
+        if [ ! -d $folder ] ; then
+          echo "failed to locate folder '$folder'"
+          exit -1
+        fi
+      done
+}
+
+
 function main()
 {
     pushd "$SCRIPTPATH" > /dev/null
@@ -29,6 +52,7 @@ function main()
     mkdir -p "index"
     pushd "index" > /dev/null
 
+    sanity_check
     index_folder
 
     popd >/dev/null
