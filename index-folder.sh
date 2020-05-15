@@ -21,9 +21,18 @@ function index_folder()
 }
 
 
+# $1 ... condiguration filepath
 function sanity_check() 
 {
-     # check configuration
+     # check configuration file exists
+    
+     configuration="$1"
+     if [ ! -f "$configiration" ] ; then 
+        echo "failed to locate configuration file '$configuration' (tip: duplicate the example configuration to '$configuration')"
+        exit -1
+     fi
+      
+     # check configured folder
     
      num_dirs="${#FOLDER_TO_INDEX[@]}"
      num_indices="${#FOLDER_INDEX_FILE[@]}"
@@ -47,13 +56,15 @@ function sanity_check()
 function main()
 {
     pushd "$SCRIPTPATH" > /dev/null
-    source index-folder.cfg
+    
+    configuration="index-folder.cfg"
+    sanity_check "$configuration"
+    source "$configuration"
 
     mkdir -p "index"
     pushd "index" > /dev/null
 
-    sanity_check
-    index_folder
+    #index_folder
 
     popd >/dev/null
     popd >/dev/null
