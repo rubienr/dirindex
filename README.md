@@ -6,7 +6,9 @@ It should help to consolidate same named files if they differ.
 **Non aim:** 
 * it is not fully automated yet
 * it is not consolidation tool but rather an assistent
-* it is not the fastest tool: 20k files on SSD take about 6 minutes
+* it is not the fastest tool: 
+  * 20k files on SSD take about 6 minutes
+  * 10k files on ext USB 3.0 HDD takes about 9 minutes 
 
 ## Usage
 
@@ -29,3 +31,9 @@ Columns are:
 * date, 
 * time, and 
 * UCT offset.
+
+### Archive Index
+
+`compress-index.sh`
+
+Archives the `./index/` folder to `index-<date>.tar.gz`.
