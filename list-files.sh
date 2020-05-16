@@ -4,7 +4,9 @@
 # $2 ... delimiter to separate columns
 function traverse_files()
 {
+    # todo: directory=$2-n
     directory="$@"
+    # todo: sqlite table=$1
     delimiter=" "
 
     SAVEIFS=$IFS
@@ -22,6 +24,7 @@ function traverse_files()
 
       f_sum=`md5sum $filepath`
 
+      # todo: this data should go to sqlite, table $1
       echo "${f_sum}${delimiter}${f_size}${delimiter}${f_date}${delimiter}${f_time}${delimiter}${f_zone}"
 
     done
