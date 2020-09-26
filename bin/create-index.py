@@ -1,7 +1,7 @@
 import argparse
-
 from Helper.config_file_handler import ConfigFileHelper
 from Helper.database_helper import DataBaseHelper
+from Helper.file_type import FileType
 
 # create parser
 parser = argparse.ArgumentParser()
@@ -20,4 +20,3 @@ cfg.read_config_file()
 
 database = DataBaseHelper()
 database.create_table()
-

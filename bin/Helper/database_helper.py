@@ -9,34 +9,35 @@ from .file_type import FileType
 class DataBaseHelper:
 
     def __init__(self, db_name="dirindex.db", table_name="directories"):
+        self.absolute_path = "absolute_path"  # type: str
+        self.relative_path = "relative_path"  # type: str
+        self.filename = "filename"  # type: str
+        self.hash_tag = "hash_tag"  # type: str
+        self.file_size = "file_size"  # type: str
+        self.last_modification_time = "last_modification_time"  # type: str
+        self.creation_time = "creation_time"  # type: str
+
         self._database_name = db_name
         self._db_connection = sqlite3.connect(self._database_name)
         self._table_name = table_name  # type:str
+        self._current_cursor = self._db_connection.cursor()
 
     ##################################################################################################
 
     def create_table(self):
 
-        absolute_path = "absolute_path"  # type: str
-        relative_path = "relative_path"  # type: str
-        filename = "filename"  # type: str
-        hash_tag = "hash_tag"  # type: str
-        file_size = "file_size"  # type: str
-        last_modification_time = "last_modification_time"  # type: str
-        creation_time = "creation_time"  # type: str
-
         # Create table
-        current_cursor = self._db_connection.cursor()
-        current_cursor.execute("CREATE TABLE IF NOT EXISTS " +
+        self._current_cursor = self._db_connection.cursor()
+        self._current_cursor.execute("CREATE TABLE IF NOT EXISTS " +
                                self._table_name + " ( " +
-                               relative_path + " text NOT NULL, " +
-                               relative_path + " text NOT NULL, " +
-                               filename + " text NOT NULL, " +
-                               hash_tag + " text NOT NULL, " +
-                               file_size + " real NOT NULL, " +
-                               last_modification_time + " text NOT NULL, " +
-                               creation_time + " text NOT NULL, " +
-                               "PRIMARY KEY ( " + absolute_path + " , " + hash_tag + " ));")
+                               self.relative_path + " text NOT NULL, " +
+                               self.relative_path + " text NOT NULL, " +
+                               self.filename + " text NOT NULL, " +
+                               self.hash_tag + " text NOT NULL, " +
+                               self.file_size + " real NOT NULL, " +
+                               self.last_modification_time + " text NOT NULL, " +
+                               self.creation_time + " text NOT NULL, " +
+                               "PRIMARY KEY ( " + self.absolute_path + " , " + self.hash_tag + " ));")
         self._db_connection.commit()
 
     ##################################################################################################
@@ -51,7 +52,23 @@ class DataBaseHelper:
                     file.last_modified_time,
                     file.creation_time)
 
-        self._db_connection.execute("INSERT INTO {} VALUES {}".format(self._table_name, sql_insert_values))
+        self._current_cursor.execute("INSERT INTO " + self._table_name + " VALUES {}".format(sql_insert_values))
         self._db_connection.commit()
 
     ##################################################################################################
+
+    def select_file_by_absolute_path(self, absolute_file_path: str):
+        if absolute_file_path == "":
+            return ""
+        self._current_cursor.execute("SELECT * FROM " + self._table_name + " WHERE " + self.absolute_path + " = ? ",
+                                     [absolute_file_path])
+        return self._current_cursor.fetchone()
+
+    ##################################################################################################
+
+    def select_file_by_hash_tag(self, hash_tag: str):
+        if hash_tag == "":
+            return ""
+        self._current_cursor.execute("SELECT * FROM " + self._table_name + " WHERE " + self.hash_tag + " = ? ",
+                                     [hash_tag])
+        return self._current_cursor.fetchone()
