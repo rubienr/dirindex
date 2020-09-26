@@ -33,7 +33,7 @@ class DirectoryIndexer:
                                                                filename=file_name,
                                                                file_extension=file_name.split('.')[-1],
                                                                hash_tag=self.calculate_hash(file_absolute_path),
-                                                               file_size=file_size_kb,
+                                                               file_size=file_size_kb/1000.0,
                                                                creation_time=creation_time,
                                                                last_modified_time=last_mod_time))
 
