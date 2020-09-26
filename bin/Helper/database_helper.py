@@ -13,7 +13,7 @@ class DataBaseHelper:
         self.filename = "filename"  # type: str
         self.file_extension = "file_extension"  # type :str
         self.hash_tag = "hash_tag"  # type: str
-        self.file_size = "file_size"  # type: str
+        self.file_size_kb = "file_size_kb"  # type: str
         self.last_modification_time = "last_modification_time"  # type: str
         self.creation_time = "creation_time"  # type: str
 
@@ -30,31 +30,33 @@ class DataBaseHelper:
         self._current_cursor = self._db_connection.cursor()
         self._current_cursor.execute("CREATE TABLE IF NOT EXISTS " +
                                      self._table_name + " ( " +
-                                     self.relative_path + " text NOT NULL, " +
+                                     self.absolute_path + " text NOT NULL, " +
                                      self.relative_path + " text NOT NULL, " +
                                      self.filename + " text NOT NULL, " +
                                      self.file_extension + " text, " +
                                      self.hash_tag + " text NOT NULL, " +
-                                     self.file_size + " real NOT NULL, " +
+                                     self.file_size_kb + " real NOT NULL, " +
                                      self.last_modification_time + " text NOT NULL, " +
                                      self.creation_time + " text NOT NULL, " +
                                      "PRIMARY KEY ( " + self.absolute_path + " , " + self.hash_tag + " ));")
         self._db_connection.commit()
 
     ##################################################################################################
-
+    # Helper function that inserts a single file in the database
     def insert_file_in_table(self, file: FileType):
-        sql_insert_values = "('{}','{}','{}','{}','{}','{}','{}')" \
-            .format(file.absolute_path,
-                    file.relative_path,
-                    file.filename,
-                    file.hash_tag,
-                    file.file_size,
-                    file.last_modified_time,
-                    file.creation_time)
-
-        self._current_cursor.execute("INSERT INTO " + self._table_name + " VALUES {}".format(sql_insert_values))
+        if file is None:
+            return
+        self._current_cursor.execute("INSERT INTO " + self._table_name + " VALUES {}"
+                                     .format(self.convert_file_type_to_sql_entry(file=file)))
         self._db_connection.commit()
+
+    ##################################################################################################
+    # Helper function that accepts a list of file objects to be inserted in the database with a single insert command.
+    def insert_files_in_table(self, files: [FileType]):
+        if len(files) is 0:
+            return
+        for file in files:
+            self.insert_file_in_table(file)
 
     ##################################################################################################
 
@@ -73,3 +75,33 @@ class DataBaseHelper:
         self._current_cursor.execute("SELECT * FROM " + self._table_name + " WHERE " + self.hash_tag + " = ? ",
                                      [hash_tag])
         return self._current_cursor.fetchone()
+
+    ##################################################################################################
+
+    def print_files_table(self):
+        self._current_cursor.execute("SELECT * FROM " + self._table_name)
+        print(self._current_cursor.fetchall())
+
+    ##################################################################################################
+
+    def count_all_rows_from_table(self):
+        self._current_cursor.execute("SELECT COUNT(*) FROM " + self._table_name)
+        return self._current_cursor.fetchone()
+
+    ##################################################################################################
+
+    def drop_files_table(self):
+        self._current_cursor.execute("DROP TABLE IF EXISTS " + self._table_name)
+
+    ##################################################################################################
+
+    def convert_file_type_to_sql_entry(self, file: FileType):
+        return "('{}','{}','{}','{}','{}','{}','{}','{}')" \
+                .format(file.absolute_path,
+                        file.relative_path,
+                        file.filename,
+                        file.file_extension,
+                        file.hash_tag,
+                        file.file_size_kb,
+                        file.last_modified_time,
+                        file.creation_time)
