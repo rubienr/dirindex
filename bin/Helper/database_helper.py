@@ -53,7 +53,7 @@ class DataBaseHelper:
     ##################################################################################################
     # Helper function that accepts a list of file objects to be inserted in the database with a single insert command.
     def insert_files_in_table(self, files: [FileType]):
-        if len(files) is 0:
+        if len(files) == 0:
             return
         for file in files:
             self.insert_file_in_table(file)
