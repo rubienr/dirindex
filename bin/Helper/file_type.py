@@ -8,7 +8,7 @@ class FileType:
         self.filename = filename
         self.file_extension = file_extension
         self.hash_tag = hash_tag
-        self.file_size = file_size
+        self.file_size_kb = file_size
         self.last_modified_time = last_modified_time
         self.creation_time = creation_time
 
@@ -16,4 +16,4 @@ class FileType:
         print("Absolute path: {} - Relative path: {} | Filename: {} | File Extension {} | Hash: {} | "
               "Size: {} kb | Last modified time: {} | Creation time: {} "
               .format(self.absolute_path, self.relative_path, self.filename, self.file_extension, self.hash_tag,
-                      self.file_size, self.last_modified_time, self.creation_time))
+                      self.file_size_kb, self.last_modified_time, self.creation_time))
