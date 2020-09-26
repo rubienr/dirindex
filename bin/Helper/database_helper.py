@@ -1,5 +1,4 @@
 import sqlite3
-from enum import Enum
 from .file_type import FileType
 
 
@@ -12,6 +11,7 @@ class DataBaseHelper:
         self.absolute_path = "absolute_path"  # type: str
         self.relative_path = "relative_path"  # type: str
         self.filename = "filename"  # type: str
+        self.file_extension = "file_extension"  # type :str
         self.hash_tag = "hash_tag"  # type: str
         self.file_size = "file_size"  # type: str
         self.last_modification_time = "last_modification_time"  # type: str
@@ -29,15 +29,16 @@ class DataBaseHelper:
         # Create table
         self._current_cursor = self._db_connection.cursor()
         self._current_cursor.execute("CREATE TABLE IF NOT EXISTS " +
-                               self._table_name + " ( " +
-                               self.relative_path + " text NOT NULL, " +
-                               self.relative_path + " text NOT NULL, " +
-                               self.filename + " text NOT NULL, " +
-                               self.hash_tag + " text NOT NULL, " +
-                               self.file_size + " real NOT NULL, " +
-                               self.last_modification_time + " text NOT NULL, " +
-                               self.creation_time + " text NOT NULL, " +
-                               "PRIMARY KEY ( " + self.absolute_path + " , " + self.hash_tag + " ));")
+                                     self._table_name + " ( " +
+                                     self.relative_path + " text NOT NULL, " +
+                                     self.relative_path + " text NOT NULL, " +
+                                     self.filename + " text NOT NULL, " +
+                                     self.file_extension + " text, " +
+                                     self.hash_tag + " text NOT NULL, " +
+                                     self.file_size + " real NOT NULL, " +
+                                     self.last_modification_time + " text NOT NULL, " +
+                                     self.creation_time + " text NOT NULL, " +
+                                     "PRIMARY KEY ( " + self.absolute_path + " , " + self.hash_tag + " ));")
         self._db_connection.commit()
 
     ##################################################################################################
