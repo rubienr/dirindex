@@ -20,7 +20,7 @@ cfg = ConfigFileHelper(config_file_path)
 cfg.read_config_file()
 
 database = DataBaseHelper()
-database.drop_files_table()
+database.drop_all_tables_and_views()
 database.create_table()
 
 # start a timer for measuring the indexing time
@@ -28,8 +28,15 @@ start = time.time()
 
 indexer = DirectoryIndexer(cfg.return_folders())
 indexer.scan_directories_and_insert(database=database)
+print("Missing files from folders:")
+missing_files_from_folders = database.get_missing_files_from_all_folders()
+for entry in missing_files_from_folders:
+    print(entry)
+
+print("Missing files count: " + str(len(missing_files_from_folders)))
+
 
 end = time.time()
 
 print("\n\nElapsed time: " + str((end - start)/60.0) + "minutes")
-print("Files indexed: " + str(database.count_all_rows_from_table()[0]))
+print("Files indexed: " + str(database.count_all_rows_from_table_or_view()[0]))
