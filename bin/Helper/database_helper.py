@@ -14,7 +14,8 @@ EXPECTED_FOLDER_STRUCTURE_VIEW_NAME = "expected_folder_structure"
 # Helper class that manages the database related functionality
 class DataBaseHelper:
 
-    def __init__(self, db_name="dirindex.db", all_files_table_name="directories"):
+    def __init__(self, db_path, all_files_table_name="directories",
+                 result_table_name="result_table"):
         self.absolute_path = "absolute_path"  # type: str
         self.relative_path = "relative_path"  # type: str
         self.filename = "filename"  # type: str
@@ -24,9 +25,13 @@ class DataBaseHelper:
         self.last_modification_time = "last_modification_time"  # type: str
         self.creation_time = "creation_time"  # type: str
 
-        self._database_name = db_name
+        if db_path is None:
+            raise ValueError("Database path is empty.")
+
+        self._database_name = db_path
         self._db_connection = sqlite3.connect(self._database_name)
         self._all_files_table_name = all_files_table_name  # type:str
+        self.result_table_name = result_table_name  # type: str
         self._current_cursor = self._db_connection.cursor()
 
     ##################################################################################################
@@ -90,9 +95,11 @@ class DataBaseHelper:
 
     ##################################################################################################
 
-    def print_files_table(self):
-        self._current_cursor.execute("SELECT * FROM " + self._all_files_table_name)
-        print(self._current_cursor.fetchall())
+    def get_all_rows_from(self, table=None):
+        if table is None:
+            table = self._all_files_table_name
+        self._current_cursor.execute("SELECT * FROM " + table)
+        return self._current_cursor.fetchall()
 
     ##################################################################################################
 
@@ -147,19 +154,20 @@ class DataBaseHelper:
         self._db_connection.commit()
 
     ##################################################################################################
-    # This function compares the complete (expected) folder structure with the existing one and returns a table with
-    # the following structure:
-    # [folder; filename of missing file from the folder; hash of missing file from the folder]
-    def get_missing_files_from_all_folders(self):
+    # This function compares the complete (expected) folder structure with the existing one and creates a table with
+    # the following columns:
+    # [folder absolute path; filename of missing file from the folder; hash of missing file from the folder]
+    def create_missing_files_from_all_folders_table(self):
         self.create_all_possible_combinations_files_folders()
         self._current_cursor.execute(
-            "SELECT DISTINCT " + EXPECTED_FOLDER_STRUCTURE_VIEW_NAME + ".* FROM " + EXPECTED_FOLDER_STRUCTURE_VIEW_NAME
-            + " WHERE NOT EXISTS (SELECT * FROM " + self._all_files_table_name +
+            "CREATE TABLE IF NOT EXISTS " + self.result_table_name +
+            " AS SELECT DISTINCT " + EXPECTED_FOLDER_STRUCTURE_VIEW_NAME + ".* FROM " +
+            EXPECTED_FOLDER_STRUCTURE_VIEW_NAME + " WHERE NOT EXISTS (SELECT * FROM " + self._all_files_table_name +
             " WHERE " + EXPECTED_FOLDER_STRUCTURE_VIEW_NAME + "." + self.hash_tag + " = " +
             self._all_files_table_name + "." + self.hash_tag + " AND " + EXPECTED_FOLDER_STRUCTURE_VIEW_NAME
             + "." + self.absolute_path + " = " + self._all_files_table_name + "." +
             self.absolute_path + " );")
-        return self._current_cursor.fetchall()
+        self._db_connection.commit()
 
     ##################################################################################################
 
