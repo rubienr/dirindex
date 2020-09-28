@@ -119,6 +119,7 @@ class DataBaseHelper:
 
     def drop_all_tables_and_views(self):
         self._current_cursor.execute("DROP TABLE IF EXISTS " + self._all_files_table_name)
+        self._current_cursor.execute("DROP TABLE IF EXISTS " + self.result_table_name)
         self._current_cursor.execute("DROP VIEW IF EXISTS " + UNIQUE_FILES_VIEW_NAME)
         self._current_cursor.execute("DROP VIEW IF EXISTS " + UNIQUE_FOLDERS_VIEW_NAME)
         self._current_cursor.execute("DROP VIEW IF EXISTS " + EXPECTED_FOLDER_STRUCTURE_VIEW_NAME)

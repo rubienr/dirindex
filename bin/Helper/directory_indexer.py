@@ -65,11 +65,12 @@ class DirectoryIndexer:
                                                                last_modified_time=last_mod_time))
                     count += 1
                     print('.', end='')
-        # Printing results
-        print(f" DONE! {count} files indexed.")
-        print("Inserting files in the database ...", end='')
-        database.insert_files_in_table(files_found_in_directories)
-        print(" DONE!")
+        if count > 0:
+            # Printing results
+            print(f" DONE! {count} files indexed.")
+            print("Inserting files in the database ...", end='')
+            database.insert_files_in_table(files_found_in_directories)
+            print(" DONE!")
         print("[INDEXING END]")
 
     ##################################################################################################
