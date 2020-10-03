@@ -25,24 +25,18 @@ if cfg.get_folders() is None:
     sys.exit(-1)
 
 indexer = DirectoryIndexer(cfg.get_folders())
-database = DataBaseHelper(db_path=cfg.get_database_path())
+database = DataBaseHelper(secret_db_path=cfg.get_secret_database_path(),
+                          public_db_path=cfg.get_public_database_path())
 
 # start a timer for measuring the indexing time
 start = time.time()
 
-database.drop_all_tables_and_views()
-database.create_table()
+# database.create_secret_index_table()
 
 indexer.scan_directories_and_insert(database=database)
-database.create_missing_files_from_all_folders_table()
-
-print("\n[RESULTS]")
-missing_files_from_folders = database.get_all_rows_from(database.result_table_name)
-if len(missing_files_from_folders) > 0:
-    print("Missing files from folders:")
-    for entry in missing_files_from_folders:
-        print(entry)
+database.create_secret_result_table()
 
 end = time.time()
 print("Elapsed time: " + str((end - start)/60.0) + "minutes")
 
+# database.drop_all_tables_and_views()
