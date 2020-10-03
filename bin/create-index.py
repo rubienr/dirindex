@@ -1,5 +1,6 @@
 import argparse
 import time
+import sys
 from Helper.config_file_handler import ConfigFileHelper
 from Helper.database_helper import DataBaseHelper
 from Helper.directory_indexer import DirectoryIndexer
@@ -19,17 +20,23 @@ config_file_path = args.cfg_file
 cfg = ConfigFileHelper(config_file_path)
 cfg.read_config_file()
 
-database = DataBaseHelper()
-database.drop_files_table()
-database.create_table()
+if cfg.get_folders() is None:
+    sys.stdout.write("No valid paths to index.")
+    sys.exit(-1)
+
+indexer = DirectoryIndexer(cfg.get_folders())
+database = DataBaseHelper(secret_db_path=cfg.get_secret_database_path(),
+                          public_db_path=cfg.get_public_database_path())
 
 # start a timer for measuring the indexing time
 start = time.time()
 
-indexer = DirectoryIndexer(cfg.return_folders())
+# database.create_secret_index_table()
+
 indexer.scan_directories_and_insert(database=database)
+database.create_secret_result_table()
 
 end = time.time()
+print("Elapsed time: " + str((end - start)/60.0) + "minutes")
 
-print("\n\nElapsed time: " + str((end - start)/60.0) + "minutes")
-print("Files indexed: " + str(database.count_all_rows_from_table()[0]))
+# database.drop_all_tables_and_views()
