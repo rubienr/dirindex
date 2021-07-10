@@ -5,38 +5,48 @@ from Helper.config_file_handler import ConfigFileHelper
 from Helper.database_helper import DataBaseHelper
 from Helper.directory_indexer import DirectoryIndexer
 
-# create parser
-parser = argparse.ArgumentParser()
+##################################################################################################
 
-# add arguments to the parser
-parser.add_argument("cfg_file")
 
-# parse the arguments
-args = parser.parse_args()
+def main():
+    # create parser
+    parser = argparse.ArgumentParser()
 
-# get the path to the configuration file
-config_file_path = args.cfg_file
+    # add arguments to the parser
+    parser.add_argument("--cfg_file")
 
-cfg = ConfigFileHelper(config_file_path)
-cfg.read_config_file()
+    # parse the arguments
+    args = parser.parse_args()
 
-if cfg.get_folders() is None:
-    sys.stdout.write("No valid paths to index.")
-    sys.exit(-1)
+    # get the path to the configuration file
+    config_file_path = args.cfg_file
 
-indexer = DirectoryIndexer(cfg.get_folders())
-database = DataBaseHelper(secret_db_path=cfg.get_secret_database_path(),
-                          public_db_path=cfg.get_public_database_path())
+    cfg = ConfigFileHelper(config_file_path)
+    cfg.read_config_file()
 
-# start a timer for measuring the indexing time
-start = time.time()
+    if cfg.get_folders() is None:
+        sys.stdout.write("No valid paths to index.")
+        sys.exit(-1)
 
-# database.create_secret_index_table()
+    indexer = DirectoryIndexer(cfg.get_folders(), cfg.get_hash_block_size())
+    database = DataBaseHelper(secret_db_path=cfg.get_secret_database_path(),
+                              public_db_path=cfg.get_public_database_path())
 
-indexer.scan_directories_and_insert(database=database)
-database.create_secret_result_table()
+    # start a timer for measuring the indexing time
+    start = time.time()
 
-end = time.time()
-print("Elapsed time: " + str((end - start)/60.0) + "minutes")
+    # database.create_secret_index_table()
 
-# database.drop_all_tables_and_views()
+    indexer.scan_directories_and_insert(database=database)
+    database.create_secret_result_table()
+
+    # database.drop_all_tables_and_views()
+
+    end = time.time()
+    print("Elapsed time: " + str((end - start) / 60.0) + "minutes")
+
+##################################################################################################
+
+
+if __name__ == "__main__":
+    main()

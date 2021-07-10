@@ -12,4 +12,3 @@ class FileType:
         self.file_size_kb = file_size
         self.last_modified_time = last_modified_time
         self.creation_time = creation_time
-

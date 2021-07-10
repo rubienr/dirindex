@@ -89,6 +89,8 @@ class DataBaseHelper:
         self._secret_db_cursor.execute("ATTACH DATABASE \"" + self._public_database_path + "\" AS public")
         self._secret_db_connection.commit()
 
+        self.drop_all_tables_and_views()
+
         self.create_public_index_table()
         self.create_secret_index_table()
 
