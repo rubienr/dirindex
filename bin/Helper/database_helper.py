@@ -1,5 +1,6 @@
 import sqlite3
-from enum import Enum
+import sys
+from backports.strenum import StrEnum  # sudo pip install backports.strenum
 from .file_type import FileType
 
 ##################################################################################################
@@ -32,28 +33,30 @@ def convert_file_type_to_sql_entry(file: FileType):
 
 ##################################################################################################
 
-class SecretIndexTableColumnNames(Enum):
+class SecretIndexTableColumnNames(StrEnum):
     """
     Enum that contains all the column names in the secret index table
     """
-    absolute_path = "absolute_path"  # type: str
-    relative_path = "relative_path"  # type: str
-    filename = "filename"  # type: str
-    file_extension = "file_extension"  # type: str
-    file_hash_tag = "file_hash_tag"  # type: str
-    absolute_path_hash_tag = "abs_path_hash_tag"  # type: str
-    file_size_kb = "file_size_kb"  # type: str
-    last_modification_time = "last_modification_time"  # type: str
-    creation_time = "creation_time"  # type: str
+    absolute_path = "absolute_path"
+    relative_path = "relative_path"
+    filename = "filename"
+    file_extension = "file_extension"
+    file_hash_tag = "file_hash_tag"
+    absolute_path_hash_tag = "abs_path_hash_tag"
+    file_size_kb = "file_size_kb"
+    last_modification_time = "last_modification_time"
+    creation_time = "creation_time"
 
 
-class PublicIndexTableColumnNames(Enum):
-    file_hash_tag = "file_hash_tag"  # type: str
-    file_extension = "file_extension"  # type: str
-    file_size_kb = "file_size_kb"  # type: str
-    last_modification_time = "last_modification_time"  # type: str
-    creation_time = "creation_time"  # type: str
-    absolute_path_hash_tag = "abs_path_hash_tag"  # type: str
+##################################################################################################
+
+class PublicIndexTableColumnNames(StrEnum):
+    file_hash_tag = "file_hash_tag"
+    file_extension = "file_extension"
+    file_size_kb = "file_size_kb"
+    last_modification_time = "last_modification_time"
+    creation_time = "creation_time"
+    absolute_path_hash_tag = "abs_path_hash_tag"
 
 
 ##################################################################################################
@@ -87,12 +90,20 @@ class DataBaseHelper:
         self._secret_db_cursor = self._secret_db_connection.cursor()
         self._public_db_cursor = self._public_db_connection.cursor()
         self._secret_db_cursor.execute("ATTACH DATABASE \"" + self._public_database_path + "\" AS public")
-        #self._secret_db_connection.commit()
 
         self.drop_all_tables_and_views()
 
         self.create_public_index_table()
         self.create_secret_index_table()
+
+    ##################################################################################################
+
+    def close_connections(self):
+        self._public_db_connection.commit()
+        self._secret_db_connection.commit()
+
+        self._public_db_connection.close()
+        self._secret_db_connection.close()
 
     ##################################################################################################
 
@@ -119,7 +130,6 @@ class DataBaseHelper:
             SecretIndexTableColumnNames.absolute_path_hash_tag.value + " , " +
             SecretIndexTableColumnNames.file_hash_tag.value +
             " ));")
-        #self._secret_db_connection.commit()
 
     ##################################################################################################
 
@@ -143,7 +153,6 @@ class DataBaseHelper:
             PublicIndexTableColumnNames.absolute_path_hash_tag.value + " , " +
             PublicIndexTableColumnNames.file_hash_tag.value +
             " ));")
-        #self._public_db_connection.commit()
 
     ##################################################################################################
 
@@ -165,7 +174,6 @@ class DataBaseHelper:
             PublicIndexTableColumnNames.absolute_path_hash_tag.value + " , " +
             PublicIndexTableColumnNames.file_hash_tag.value +
             " ));")
-        #self._public_db_connection.commit()
 
     ##################################################################################################
 
@@ -177,9 +185,13 @@ class DataBaseHelper:
         """
         if file is None:
             return
-        self._secret_db_cursor.execute("INSERT INTO " + self._secret_index_table_name + " VALUES {}"
-                                       .format(convert_file_type_to_sql_entry(file)))
-        #self._secret_db_connection.commit()
+
+        try:
+            self._secret_db_cursor.execute("INSERT INTO " + self._secret_index_table_name + " VALUES {}"
+                                           .format(convert_file_type_to_sql_entry(file)))
+        except sqlite3.Error as e:
+            print(convert_file_type_to_sql_entry(file))
+            raise e
 
     ##################################################################################################
 
@@ -190,13 +202,11 @@ class DataBaseHelper:
         :return:
         """
         print("Inserting into secret database...")
-        if len(files) == 0:
+        if len(files) <= 0:
             return
 
         for file in files:
             self._insert_file_in_secret_table(file)
-
-        self._secret_db_connection.commit()
 
         print("Inserting into public database...")
 
@@ -210,8 +220,6 @@ class DataBaseHelper:
             SecretIndexTableColumnNames.last_modification_time.value + " , " +
             SecretIndexTableColumnNames.creation_time.value +
             " FROM " + self._secret_index_table_name)
-
-        self._public_db_connection.commit()
 
         print("Inserting into database: done.")
 
@@ -253,11 +261,9 @@ class DataBaseHelper:
         self._secret_db_cursor.execute("DROP VIEW IF EXISTS " + UNIQUE_FILES_VIEW_NAME)
         self._secret_db_cursor.execute("DROP VIEW IF EXISTS " + UNIQUE_FOLDERS_VIEW_NAME)
         self._secret_db_cursor.execute("DROP VIEW IF EXISTS " + EXPECTED_FOLDER_STRUCTURE_VIEW_NAME)
-        #self._secret_db_connection.commit()
 
         self._public_db_cursor.execute("DROP TABLE IF EXISTS " + self._public_index_table_name)
         self._public_db_cursor.execute("DROP TABLE IF EXISTS " + self._public_result_table_name)
-        #self._public_db_connection.commit()
 
     ##################################################################################################
 
@@ -272,8 +278,7 @@ class DataBaseHelper:
                                        SecretIndexTableColumnNames.filename.value + " , " +
                                        SecretIndexTableColumnNames.file_extension.value + " , " +
                                        SecretIndexTableColumnNames.file_size_kb.value +
-                                             " FROM " + self._secret_index_table_name)
-        #self._secret_db_connection.commit()
+                                       " FROM " + self._secret_index_table_name)
 
     ##################################################################################################
 
@@ -286,9 +291,8 @@ class DataBaseHelper:
         self._secret_db_cursor.execute("CREATE VIEW " + UNIQUE_FOLDERS_VIEW_NAME + " AS " + "SELECT DISTINCT " +
                                        SecretIndexTableColumnNames.absolute_path.value + " , " +
                                        SecretIndexTableColumnNames.absolute_path_hash_tag.value +
-                                             " FROM " +
+                                       " FROM " +
                                        self._secret_index_table_name)
-        #self._secret_db_connection.commit()
 
     ##################################################################################################
 
@@ -313,7 +317,6 @@ class DataBaseHelper:
             " FROM " + UNIQUE_FOLDERS_VIEW_NAME + " AS folder CROSS JOIN " +
             UNIQUE_FILES_VIEW_NAME + " AS file")
         print("Creating possible combinations: done.")
-        #self._secret_db_connection.commit()
 
     ##################################################################################################
 
@@ -328,6 +331,7 @@ class DataBaseHelper:
         self._create_all_possible_combinations_files_folders()
 
         print("Create result table ...")
+        sys.stdout.flush()
         self._secret_db_cursor.execute(
             "CREATE TABLE IF NOT EXISTS " + self._secret_result_table_name +
             " AS SELECT DISTINCT " +
@@ -347,9 +351,9 @@ class DataBaseHelper:
             self._secret_index_table_name + "." + SecretIndexTableColumnNames.absolute_path.value +
 
             " );")
-        self._secret_db_connection.commit()
 
         print("Query 1: done.")
+        sys.stdout.flush()
 
         self._create_public_result_table()
 
@@ -362,9 +366,8 @@ class DataBaseHelper:
             SecretIndexTableColumnNames.file_size_kb.value +
             " FROM " + self._secret_result_table_name)
 
-        self._secret_db_connection.commit()
-
         print("Create result table: done.")
+        sys.stdout.flush()
 
         #
         # self._public_db_cursor.execute("ALTER TABLE " + self._public_result_table_name +
@@ -395,6 +398,5 @@ class DataBaseHelper:
         #     self._public_result_table_name + "." + PublicIndexTableColumnNames.file_hash_tag.value
         # )
         #
-        # self._public_db_connection.commit()
 
     ##################################################################################################

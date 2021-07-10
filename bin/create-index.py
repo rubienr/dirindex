@@ -1,9 +1,11 @@
 import argparse
 import time
 import sys
+from datetime import timedelta
 from Helper.config_file_handler import ConfigFileHelper
 from Helper.database_helper import DataBaseHelper
 from Helper.directory_indexer import DirectoryIndexer
+
 
 ##################################################################################################
 
@@ -32,14 +34,15 @@ def main():
     database = DataBaseHelper(secret_db_path=cfg.get_secret_database_path(),
                               public_db_path=cfg.get_public_database_path())
 
-    # start a timer for measuring the indexing time
-    start = time.time()
+    try:
+        start_timestamp = time.time()
+        indexer.scan_directories_and_insert(database=database)
+        # database.create_secret_result_table()
+    finally:
+        database.close_connections()
 
-    indexer.scan_directories_and_insert(database=database)
-    # database.create_secret_result_table()
+    print("Elapsed time " + str(timedelta(seconds=time.time() - start_timestamp)))
 
-    end = time.time()
-    print("Elapsed time: " + str((end - start) / 60.0) + " minutes")
 
 ##################################################################################################
 
