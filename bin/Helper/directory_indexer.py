@@ -1,20 +1,23 @@
 import os
+import sys
 # from blake2b import blake2b
 import hashlib
 from .database_helper import DataBaseHelper
 from .file_type import FileType
 import datetime
 
+
 ##################################################################################################
 
 
-def calculate_hash(file_path: str, block_size: int = 10240):
+def calculate_hash(file_path: str, block_size: int = 10240, hash_content=True):
     """
     Helper function that calculates the hash of a file/folder.
     If the given path is a folder: the hash of the string absolute path will be calculated
     If the given path is a file: the hash of the binary content will be calculated
-    :param file_path:
+    :param file_path: complete path to file with extension
     :param block_size:
+    :param hash_content: Hash the file content (True) or the file_path string (False)
     :return: 
     """
 
@@ -37,8 +40,11 @@ def calculate_hash(file_path: str, block_size: int = 10240):
 
     hash_sum = hashlib.md5()
 
-    if os.path.isdir(file_path):
+    if not hash_content:
         hash_sum.update(file_path.encode())
+    if os.path.isdir(file_path):
+        # todo
+        assert(False)
     else:
         with open(file_path, "rb") as f:
             for block in iter(lambda: f.read(block_size), b""):
@@ -53,10 +59,12 @@ class DirectoryIndexer:
     """
     Helper class that indexes all the folders found in self._directory_list.
     """
-    def __init__(self, directory_list: [str], hash_block_size: int = 1024):
+
+    def __init__(self, directory_list: [str], hash_file_block_size: int = 1024, hash_file_name_block_size: int = 1024):
         self._directory_list = directory_list  # type: [str]
         self.files_found_in_directories = []  # type: [FileType]
-        self._hash_block_size = hash_block_size  # type: int
+        self._hash_file_name_block_size = hash_file_name_block_size  # type: int
+        self._hash_file_block_size = hash_file_block_size  # type: int
 
     ##################################################################################################
 
@@ -71,6 +79,8 @@ class DirectoryIndexer:
                     # count files in subdirectories
                     if os.path.isfile(os.path.join(root_directory, file)):
                         count += 1
+
+        print("Indexing done.")
         return count
 
     ##################################################################################################
@@ -99,37 +109,41 @@ class DirectoryIndexer:
         FileType objects.
         :return: int Number of files indexed
         """
-        for folder in self._directory_list:
-            for root_directory, sub_dir_list, file_list in os.walk(folder):
+        for root_directory in self._directory_list:
+            num_processed_files = 0
+            num_folders = 0
+            print("Indexing folder {} ...".format(root_directory), end=" ")
+            sys.stdout.flush()
+            for rel_dir, dirs, files in os.walk(root_directory):
+                rel_dir = os.path.relpath(rel_dir, root_directory)
+
+                num_processed_files += len(files)
+                num_folders += len(dirs)
+
                 # TODO - process multithreaded
-                for file in file_list:
+                for dir_entry in files:
                     # index files in top level in the current directory
-                    self._generate_file_information(root_directory, relative_path_with_name=file)
-                for file in sub_dir_list:
-                    # index files in subdirectories
-                    if os.path.isfile(os.path.join(root_directory, file)):
-                        self._generate_file_information(root_directory, relative_path_with_name=file)
+                    self._generate_file_information(root_directory, rel_dir, dir_entry)
+
+            print("{} files processed ({} folders).".format(num_processed_files, num_folders))
+            sys.stdout.flush()
 
     ##################################################################################################
 
-    def _generate_file_information(self, root_directory: str, relative_path_with_name: str):
+    def _generate_file_information(self, root_directory: str, relative_directory: str, file_name: str):
         """
         Helper function that creates a FileType object, fills in all the fields and inserts that object in the
         indexed files list.
-        :param root_directory: absolute path of the root directory (current directory being indexed)
-        :param relative_path_with_name: relative path of the file (relative to the root directory)
+        :param root_directory: absolute path to the root directory (current directory being indexed)
+        :param relative_directory: relative path of the file (from the root_directory)
+        :param file_name: file name with extension
         :return:
         """
-        file_absolute_path = os.path.join(root_directory, relative_path_with_name)
-        relative_path = "root" if relative_path_with_name.rfind('/') == -1 \
-            else relative_path_with_name[:relative_path_with_name.rfind('/')]
 
-        # folder_absolute_path = os.path.join(root_directory, relative_path) if relative_path != "root" \
-        #     else root_directory
+        folder_absolute_path = os.path.join(root_directory, relative_directory)
+        file_absolute_path = os.path.join(folder_absolute_path, file_name)
 
-        file_name_and_extension = file_absolute_path.split('/')[-1]
         file_size_kb = os.stat(file_absolute_path).st_size
-
         creation_time = datetime.datetime.fromtimestamp(
             os.stat(file_absolute_path).st_ctime).strftime('%Y-%m-%d-%H:%M:%S')
         last_mod_time = datetime.datetime.fromtimestamp(
@@ -137,11 +151,12 @@ class DirectoryIndexer:
 
         self.files_found_in_directories.append(
             FileType(absolute_path=root_directory,
-                     absolute_path_hash_tag=calculate_hash(file_absolute_path),
-                     relative_path=relative_path,
-                     filename=file_name_and_extension.split('.')[0],
-                     file_extension=file_name_and_extension.split('.')[-1],
-                     hash_tag=calculate_hash(file_absolute_path, self._hash_block_size),
+                     absolute_path_hash_tag=calculate_hash(file_absolute_path,
+                                                           self._hash_file_name_block_size, hash_content=False),
+                     relative_path=relative_directory,
+                     filename=file_name.split('.')[0],
+                     file_extension=file_name.split('.')[-1],
+                     hash_tag=calculate_hash(file_absolute_path, self._hash_file_block_size, hash_content=True),
                      file_size=file_size_kb / 1000.0,
                      creation_time=creation_time,
                      last_modified_time=last_mod_time))

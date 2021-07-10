@@ -8,9 +8,16 @@ SCRIPT_PATH=`dirname $SCRIPT_RELPATH`
 
 function main() 
 {
-   /bin/python3 $SCRIPT_PATH/bin/create-index.py --cfg_file $SCRIPT_PATH/cfg/example_config.cfg
+  local config_name="$1"
+  if [ "x$config_name" == "x" ] ; then
+    config_file="example_config"
+  fi
+
+   /bin/python3 $SCRIPT_PATH/bin/create-index.py --cfg_file $SCRIPT_PATH/cfg/${config_name}.cfg
 }
 
 if [ "x$EXECUTE" == "x1" ] ; then
     main "${@}" # pass all command line arguments (as strings)
 fi
+
+# usage: create-index.sh config-name-wo-extension

@@ -5,15 +5,17 @@ from pathlib import Path
 ##################################################################################################
 
 DEFAULT_SECTION_NAME = "DEFAULT"
-PATHS_SECTION_NAME = "paths"
-HASHING_SECTION_NAME = "hashing"
-HASHING_BLOCK_SIZE_FIELD_NAME = "block_size"
-DEFAULT_SECRET_DB_NAME = "secret_database.db"
-DEFAULT_PUBLIC_DB_NAME = "public_database.db"
 SECRET_DB_CONFIG_FIELD_NAME = "secret_database_file_path"
 PUBLIC_DB_CONFIG_FIELD_NAME = "public_database_file_path"
+DEFAULT_SECRET_DB_NAME = "secret_database.db"
+DEFAULT_PUBLIC_DB_NAME = "public_database.db"
+
+PATHS_SECTION_NAME = "paths"
 FOLDER_LIST_FIELD_NAME = "folders"
 
+HASHING_SECTION_NAME = "hashing"
+HASHING_BLOCK_SIZE_FIELD_NAME = "file_block_size"
+HASHING_FILE_NAME_BLOCK_SIZE_FIELD_NAME = "file_name_block_size"
 
 ##################################################################################################
 
@@ -36,7 +38,8 @@ class ConfigFileHelper:
         self._folders = []  # type: [str]
         self._secret_database_file_path = ""  # type: str
         self._public_database_file_path = ""  # type: str
-        self._hash_block_size = 0  # type: int
+        self._hash_file_block_size = 0  # type: int
+        self._hash_file_name_block_size = 0  # type: int
 
     ##################################################################################################
 
@@ -66,7 +69,8 @@ class ConfigFileHelper:
         # Get all the folder paths listed in the config file and save them in self._folders member
         self._handle_paths_list()
 
-        self._handle_hash_block_size()
+        self._handle_hash_file_block_size()
+        self._handle_hash_file_name_block_size()
 
         print("Successfully loaded configuration file.")
         print("Printing loaded values: ")
@@ -77,7 +81,8 @@ class ConfigFileHelper:
         print("  {}: {}".format(FOLDER_LIST_FIELD_NAME, self._folders))
 
         print("{}:".format(HASHING_SECTION_NAME))
-        print("  {}: {}".format(HASHING_BLOCK_SIZE_FIELD_NAME, self._hash_block_size))
+        print("  {}: {}".format(HASHING_BLOCK_SIZE_FIELD_NAME, self._hash_file_block_size))
+        print("  {}: {}".format(HASHING_FILE_NAME_BLOCK_SIZE_FIELD_NAME, self._hash_file_name_block_size))
 
     print("[CONFIGURATION LOAD END]")
 
@@ -132,7 +137,7 @@ class ConfigFileHelper:
             raise ValueError("ERROR: '[{}]' section not present in the loaded configuration"
                              .format(PATHS_SECTION_NAME))
         if not self._parser.has_option(PATHS_SECTION_NAME, FOLDER_LIST_FIELD_NAME):
-            raise ValueError("ERROR: '[{}}]' section does not contain '{}' parameter"
+            raise ValueError("ERROR: '[{}]' section does not contain '{}' parameter"
                              .format(PATHS_SECTION_NAME, FOLDER_LIST_FIELD_NAME))
 
         provided_paths = self._parser.get(PATHS_SECTION_NAME, FOLDER_LIST_FIELD_NAME).split('\n')
@@ -148,14 +153,28 @@ class ConfigFileHelper:
 
     ##################################################################################################
 
-    def _handle_hash_block_size(self):
+    def _handle_hash_file_block_size(self):
         if not self._parser.has_section(HASHING_SECTION_NAME):
             raise ValueError(
                 "ERROR: '[{}]' section not present in the loaded configuration".format(HASHING_SECTION_NAME))
         if not self._parser.has_option(HASHING_SECTION_NAME, HASHING_BLOCK_SIZE_FIELD_NAME):
-            raise ValueError("ERROR: '[{}}]' section does not contain 'folders' parameter".format(HASHING_SECTION_NAME))
+            raise ValueError("ERROR: '[{}]' section does not contain '{}' parameter"
+                             .format(HASHING_SECTION_NAME, HASHING_BLOCK_SIZE_FIELD_NAME))
 
-        self._hash_block_size = int(self._parser.get(HASHING_SECTION_NAME, HASHING_BLOCK_SIZE_FIELD_NAME))
+        self._hash_file_block_size = int(self._parser.get(HASHING_SECTION_NAME, HASHING_BLOCK_SIZE_FIELD_NAME))
+
+    ##################################################################################################
+
+    def _handle_hash_file_name_block_size(self):
+        if not self._parser.has_section(HASHING_SECTION_NAME):
+            raise ValueError(
+                "ERROR: '[{}]' section not present in the loaded configuration".format(HASHING_SECTION_NAME))
+        if not self._parser.has_option(HASHING_SECTION_NAME, HASHING_FILE_NAME_BLOCK_SIZE_FIELD_NAME):
+            raise ValueError(
+                "ERROR: '[{}}]' section does not contain '{}' parameter"
+                    .format(HASHING_SECTION_NAME, HASHING_FILE_NAME_BLOCK_SIZE_FIELD_NAME))
+
+        self._hash_file_name_block_size = int(self._parser.get(HASHING_SECTION_NAME, HASHING_FILE_NAME_BLOCK_SIZE_FIELD_NAME))
 
     ##################################################################################################
 
@@ -174,5 +193,10 @@ class ConfigFileHelper:
 
     ##################################################################################################
 
-    def get_hash_block_size(self):
-        return self._hash_block_size
+    def get_hash_file_block_size(self):
+        return self._hash_file_block_size
+
+    ##################################################################################################
+
+    def get_hash_file_name_block_size(self):
+        return self._hash_file_name_block_size

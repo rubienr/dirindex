@@ -3,3 +3,4 @@
 venv
 cfg/*
 !cfg/example_config.cfg
+**.db

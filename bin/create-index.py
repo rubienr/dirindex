@@ -28,22 +28,18 @@ def main():
         sys.stdout.write("No valid paths to index.")
         sys.exit(-1)
 
-    indexer = DirectoryIndexer(cfg.get_folders(), cfg.get_hash_block_size())
+    indexer = DirectoryIndexer(cfg.get_folders(), cfg.get_hash_file_block_size(), cfg.get_hash_file_name_block_size())
     database = DataBaseHelper(secret_db_path=cfg.get_secret_database_path(),
                               public_db_path=cfg.get_public_database_path())
 
     # start a timer for measuring the indexing time
     start = time.time()
 
-    # database.create_secret_index_table()
-
     indexer.scan_directories_and_insert(database=database)
-    database.create_secret_result_table()
-
-    # database.drop_all_tables_and_views()
+    # database.create_secret_result_table()
 
     end = time.time()
-    print("Elapsed time: " + str((end - start) / 60.0) + "minutes")
+    print("Elapsed time: " + str((end - start) / 60.0) + " minutes")
 
 ##################################################################################################
 
