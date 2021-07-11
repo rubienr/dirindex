@@ -1,6 +1,6 @@
 **__pycache__
 .idea/
 venv
-cfg/*
-!cfg/example_config.cfg
+configurations/*
+!configurations/example_config.cfg
 **.db

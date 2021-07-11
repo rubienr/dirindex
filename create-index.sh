@@ -13,7 +13,7 @@ function main()
     config_file="example_config"
   fi
 
-   /bin/python3 $SCRIPT_PATH/bin/create-index.py --cfg_file $SCRIPT_PATH/cfg/${config_name}.cfg
+   /bin/python3 $SCRIPT_PATH/bin/create-index.py --cfg_file $SCRIPT_PATH/configurations/${config_name}.cfg
 }
 
 if [ "x$EXECUTE" == "x1" ] ; then

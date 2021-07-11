@@ -1,6 +1,8 @@
 import sqlite3
 import sys
 from backports.strenum import StrEnum  # sudo pip install backports.strenum
+
+from .databases_config_mixin import DatabasesConfigMixin
 from .file_type import FileType
 
 ##################################################################################################
@@ -67,9 +69,12 @@ class DataBaseHelper:
     Helper class that manages the database related functionality
     """
 
-    def __init__(self, secret_db_path, public_db_path,
+    def __init__(self, database_config: DatabasesConfigMixin,
                  index_table_name="index_table",
                  result_table_name="result_table"):
+
+        secret_db_path = database_config.get_secret_database_path()
+        public_db_path = database_config.get_public_database_path()
 
         if secret_db_path is None or public_db_path is None:
             # We should never reach this point.
@@ -201,14 +206,14 @@ class DataBaseHelper:
         :param files: List of FileType objects
         :return:
         """
-        print("Inserting into secret database...")
+        print("Storing data sets to private database ...")
         if len(files) <= 0:
             return
 
         for file in files:
             self._insert_file_in_secret_table(file)
 
-        print("Inserting into public database...")
+        print("Storing data sets to public database ...")
 
         self._secret_db_connection.execute(
             "INSERT INTO public." + self._public_index_table_name
@@ -221,7 +226,7 @@ class DataBaseHelper:
             SecretIndexTableColumnNames.creation_time.value +
             " FROM " + self._secret_index_table_name)
 
-        print("Inserting into database: done.")
+        print("Storing data to database done.")
 
     ##################################################################################################
 

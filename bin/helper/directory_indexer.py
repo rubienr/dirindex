@@ -1,15 +1,17 @@
 import os
 import sys
+from timeit import default_timer as timer
+from datetime import datetime, timedelta
 import hashlib
 from typing import List
 from .database_helper import DataBaseHelper
 from .file_type import FileType
-import datetime
 import concurrent
 import concurrent.futures
 
-
 ##################################################################################################
+from .hashing_config_mixin import HashingConfigMixin
+from .path_config_mixin import PathConfigMixin
 
 
 def calculate_hash(file_path: str, block_size: int = 10240, hash_content=True):
@@ -41,14 +43,14 @@ def calculate_hash(file_path: str, block_size: int = 10240, hash_content=True):
 
 class DirectoryIndexer:
     """
-    Helper class that indexes all the folders found in self._directory_list.
+    helper class that indexes all the folders found in self._directory_list.
     """
 
-    def __init__(self, directory_list: [str], hash_file_block_size: int = 1024, hash_file_name_block_size: int = 1024):
-        self._directory_list = directory_list  # type: List[str]
+    def __init__(self, paths_config: PathConfigMixin, hash_config: HashingConfigMixin):
+        self._directory_list = paths_config.get_folders()  # type: List[str]
         self.files_found_in_directories = []  # type: List[FileType]
-        self._hash_file_name_block_size = hash_file_name_block_size  # type: int
-        self._hash_file_block_size = hash_file_block_size  # type: int
+        self._hash_file_name_block_size = hash_config.get_hash_file_name_block_size()  # type: int
+        self._hash_file_block_size = hash_config.get_hash_file_block_size()  # type: int
 
     ##################################################################################################
 
@@ -75,14 +77,18 @@ class DirectoryIndexer:
         :param database:
         :return:
         """
+
         print("\n[INDEXING START]")
+        start_timestamp = timer()
         print("Indexing files. This might take a few minutes. Please wait... ")
         self._index_folders()
-        count = len(self.files_found_in_directories)
-        if count > 0:
+        print("[INDEXING END] Time elapsed {}.".format(timedelta(seconds=timer() - start_timestamp)))
+
+        print("\n[DATABASE TRANSACTIONS START]")
+        start_timestamp = timer()
+        if len(self.files_found_in_directories) > 0:
             database.insert_files_in_both_databases(self.files_found_in_directories)
-        print(f"DONE! {count} files indexed.")
-        print("[INDEXING END]")
+        print("[DATABASE TRANSACTIONS END] Time elapsed {}.".format(timedelta(seconds=timer() - start_timestamp)))
 
     ##################################################################################################
 
@@ -93,12 +99,8 @@ class DirectoryIndexer:
         :return: int Number of files indexed
         """
 
-        print("Start indexing ...")
-
         num_total_processed_files = 0
         num_total_folders = 0
-        num_total_results = 0
-        num_total_tasks = 0
 
         with concurrent.futures.ProcessPoolExecutor() as executor:
             for root_directory in self._directory_list:
@@ -132,9 +134,6 @@ class DirectoryIndexer:
                 num_total_processed_files += num_processed_files
                 num_total_folders += num_folders
 
-                num_total_results = num_results
-                num_total_tasks = num_tasks
-
         print("Indexed overall {o} files in {f} folders ({i} items total)."
               .format(o=num_total_processed_files,
                       f=num_total_folders,
@@ -161,9 +160,9 @@ def _generate_file_information(root_directory: str, relative_directory: str, fil
     file_absolute_path = os.path.join(folder_absolute_path, file_name)
 
     file_size_kb = os.stat(file_absolute_path).st_size
-    creation_time = datetime.datetime.fromtimestamp(
+    creation_time = datetime.fromtimestamp(
         os.stat(file_absolute_path).st_ctime).strftime('%Y-%m-%d-%H:%M:%S')
-    last_mod_time = datetime.datetime.fromtimestamp(
+    last_mod_time = datetime.fromtimestamp(
         os.stat(file_absolute_path).st_mtime).strftime('%Y-%m-%d-%H:%M:%S')
 
     return FileType(

@@ -1,10 +1,10 @@
 import argparse
-import time
+from timeit import default_timer as timer
 import sys
 from datetime import timedelta
-from Helper.config_file_handler import ConfigFileHelper
-from Helper.database_helper import DataBaseHelper
-from Helper.directory_indexer import DirectoryIndexer
+from helper.config_file_handler import ConfigFileHelper
+from helper.database_helper import DataBaseHelper
+from helper.directory_indexer import DirectoryIndexer
 
 
 ##################################################################################################
@@ -24,24 +24,23 @@ def main():
     config_file_path = args.cfg_file
 
     cfg = ConfigFileHelper(config_file_path)
-    cfg.read_config_file()
+    cfg.read_config()
 
     if cfg.get_folders() is None:
         sys.stdout.write("No valid paths to index.")
         sys.exit(-1)
 
-    indexer = DirectoryIndexer(cfg.get_folders(), cfg.get_hash_file_block_size(), cfg.get_hash_file_name_block_size())
-    database = DataBaseHelper(secret_db_path=cfg.get_secret_database_path(),
-                              public_db_path=cfg.get_public_database_path())
+    indexer = DirectoryIndexer(cfg, cfg)
+    database = DataBaseHelper(cfg)
 
     try:
-        start_timestamp = time.time()
+        start_timestamp = timer()
         indexer.scan_directories_and_insert(database=database)
         # database.create_secret_result_table()
     finally:
         database.close_connections()
 
-    print("Elapsed time " + str(timedelta(seconds=time.time() - start_timestamp)))
+    print("\nOverall elapsed time {}.".format(timedelta(seconds=timer() - start_timestamp)))
 
 
 ##################################################################################################
