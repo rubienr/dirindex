@@ -21,9 +21,9 @@ class HashingConfigMixin(object):
 
     ##################################################################################################
 
-    def read_config(self):
-        self._handle_hash_file_block_size()
-        self._handle_hash_file_name_block_size()
+    def read_hashing_config(self):
+        self.__handle_hash_file_block_size()
+        self.__handle_hash_file_name_block_size()
 
         print("[{}]".format(HashingConfigMixin.SECTION_NAME))
         print("\t{} = '{}'".format(HashingConfigMixin.BLOCK_SIZE_FIELD_NAME, self._hash_file_block_size))
@@ -41,7 +41,7 @@ class HashingConfigMixin(object):
 
     ##################################################################################################
 
-    def _handle_hash_file_block_size(self):
+    def __handle_hash_file_block_size(self):
         if not self._parser.has_section(HashingConfigMixin.SECTION_NAME):
             raise ValueError(
                 "ERROR: '[{}]' section not present in the loaded configuration"
@@ -58,7 +58,7 @@ class HashingConfigMixin(object):
 
     ##################################################################################################
 
-    def _handle_hash_file_name_block_size(self):
+    def __handle_hash_file_name_block_size(self):
         if not self._parser.has_section(HashingConfigMixin.SECTION_NAME):
             raise ValueError(
                 "ERROR: '[{}]' section not present in the loaded configuration".format(HashingConfigMixin.SECTION_NAME))

@@ -1,10 +1,10 @@
 import argparse
 from datetime import timedelta
 from timeit import default_timer as timer
+from typing import List, Union
 
-from helper.config_file_handler import IndexingConfiguration
-from helper.database_helper import DataBaseIndexHelper
-from helper.directory_indexer import DirectoryIndexer
+from helper.config_file_handler import EvaluationConfiguration
+from helper.database_helper import DataBaseEvaluationHelper, UniqueFileFolderEvaluator, ExpectedFolderStructureEvaluator
 
 
 ##################################################################################################
@@ -19,15 +19,16 @@ def main():
                              "An example Configuration can be found in the 'configurations' folder.")
     args = parser.parse_args()
 
-    cfg = IndexingConfiguration(args.cfg_file[0])
+    cfg = EvaluationConfiguration(args.cfg_file[0])
     cfg.read_config()
 
-    indexer = DirectoryIndexer(cfg, cfg)
-    database = DataBaseIndexHelper(cfg)
+    database = DataBaseEvaluationHelper(cfg, cfg)
+    evaluators = [UniqueFileFolderEvaluator(database), ExpectedFolderStructureEvaluator(
+        database)]  # type: List[Union[UniqueFileFolderEvaluator, ExpectedFolderStructureEvaluator]]
 
     try:
         start_timestamp = timer()
-        indexer.scan_directories_and_insert(database)
+        [e.evaluate() for e in evaluators]
     finally:
         database.close_connections()
 

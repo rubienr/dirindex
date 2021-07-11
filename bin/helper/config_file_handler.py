@@ -1,14 +1,14 @@
 import os
 from configparser import ConfigParser
 
-
 ##################################################################################################
 from .databases_config_mixin import DatabasesConfigMixin
+from .evaluation_config_mixin import EvaluationConfigMixin
 from .hashing_config_mixin import HashingConfigMixin
 from .path_config_mixin import PathConfigMixin
 
 
-class ConfigFileHelper(DatabasesConfigMixin, PathConfigMixin, HashingConfigMixin):
+class IndexingConfiguration(DatabasesConfigMixin, PathConfigMixin, HashingConfigMixin, EvaluationConfigMixin):
     """
     helper class that handles opening and managing the configuration file that contains the folders to be indexed by
     the tool.
@@ -28,6 +28,7 @@ class ConfigFileHelper(DatabasesConfigMixin, PathConfigMixin, HashingConfigMixin
         DatabasesConfigMixin.__init__(self, self._parser)
         PathConfigMixin.__init__(self, self._parser)
         HashingConfigMixin.__init__(self, self._parser)
+        EvaluationConfigMixin.__init__(self, self._parser)
 
     ##################################################################################################
 
@@ -49,8 +50,32 @@ class ConfigFileHelper(DatabasesConfigMixin, PathConfigMixin, HashingConfigMixin
 
         self._parser.read_file(open(self._config_file_path, mode='r'))
 
-        DatabasesConfigMixin.read_config(self)
-        PathConfigMixin.read_config(self)
-        HashingConfigMixin.read_config(self)
+        self.read_dbs_config()
+        self.read_folder_config()
+        self.read_hashing_config()
+        self.read_evaluation_config()
 
         print("Loading configuration done.")
+
+
+######################################################################################################
+
+class EvaluationConfiguration(IndexingConfiguration, EvaluationConfigMixin):
+
+    ##################################################################################################
+
+    def __init__(self, config_file_path: str):
+        self._config_file_path = config_file_path  # type: str
+        self._parser = ConfigParser(allow_no_value=True)  # type: ConfigParser
+
+        DatabasesConfigMixin.__init__(self, self._parser)
+        PathConfigMixin.__init__(self, self._parser)
+        HashingConfigMixin.__init__(self, self._parser)
+        EvaluationConfigMixin.__init__(self, self._parser)
+
+    ##################################################################################################
+
+    def read_config(self):
+        self.read_evaluation_config()
+        IndexingConfiguration.read_config(self)
+

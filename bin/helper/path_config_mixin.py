@@ -1,4 +1,5 @@
 import os
+import sys
 from configparser import ConfigParser
 
 
@@ -15,8 +16,8 @@ class PathConfigMixin(object):
 
     ##################################################################################################
 
-    def read_config(self):
-        self._handle_paths_list()
+    def read_folder_config(self):
+        self.__handle_paths_list()
 
         print("[{}]".format(PathConfigMixin.PATHS_SECTION_NAME))
         print("\t{} = '{}'".format(PathConfigMixin.FOLDER_LIST_FIELD_NAME, self._folders))
@@ -28,7 +29,7 @@ class PathConfigMixin(object):
 
     ##################################################################################################
 
-    def _handle_paths_list(self):
+    def __handle_paths_list(self):
 
         if not self._parser.has_section(PathConfigMixin.PATHS_SECTION_NAME):
             raise ValueError("ERROR: '[{}]' section not present in the loaded configuration"
@@ -48,3 +49,7 @@ class PathConfigMixin(object):
                 print(f"WARNING: {folder} does not exist. Will be skipped.")
                 continue
             self._folders.append(folder)
+
+        if len(self._folders) <= 0:
+            print("No valid paths to index.")
+            sys.exit(-1)

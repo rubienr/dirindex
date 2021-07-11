@@ -1,14 +1,14 @@
-import os
-import sys
-from timeit import default_timer as timer
-from datetime import datetime, timedelta
-import hashlib
-from typing import List
-from .database_helper import DataBaseHelper
-from .file_type import FileType
 import concurrent
 import concurrent.futures
+import hashlib
+import os
+import sys
+from datetime import datetime, timedelta
+from timeit import default_timer as timer
+from typing import List
 
+from .database_helper import DataBaseIndexHelper
+from .file_type import FileType
 ##################################################################################################
 from .hashing_config_mixin import HashingConfigMixin
 from .path_config_mixin import PathConfigMixin
@@ -71,7 +71,7 @@ class DirectoryIndexer:
 
     ##################################################################################################
 
-    def scan_directories_and_insert(self, database: DataBaseHelper):
+    def scan_directories_and_insert(self, database: DataBaseIndexHelper):
         """
         This function triggers the directory indexing, and inserts all the files in the provided database
         :param database:

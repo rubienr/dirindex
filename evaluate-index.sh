@@ -13,11 +13,11 @@ function main()
     config_file="example_config"
   fi
 
-   /bin/python3 $SCRIPT_PATH/bin/create-index.py --configuration_file $SCRIPT_PATH/configurations/${config_name}.cfg
+   /bin/python3 $SCRIPT_PATH/bin/evaluate-unique.py --configuration_file $SCRIPT_PATH/configurations/${config_name}.cfg
 }
 
 if [ "x$EXECUTE" == "x1" ] ; then
     main "${@}" # pass all command line arguments (as strings)
 fi
 
-# usage: create-index.sh config-name-wo-extension
+# usage: evaluate-index.sh config-name-wo-extension
