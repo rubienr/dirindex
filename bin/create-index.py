@@ -22,14 +22,14 @@ def main():
     cfg = IndexingConfiguration(args.cfg_file[0])
     cfg.read_config()
 
-    indexer = DirectoryIndexer(cfg, cfg)
-    database = DataBaseIndexHelper(cfg)
+    indexer = DirectoryIndexer(cfg.paths_cfg, cfg.hashing_cfg)
+    database = DataBaseIndexHelper(cfg.private_index_db_cfg, cfg.public_index_db_cfg)
 
     try:
         start_timestamp = timer()
         indexer.scan_directories_and_insert(database)
     finally:
-        database.close_connections()
+        database.close()
 
     print("\nOverall elapsed time {}.".format(timedelta(seconds=timer() - start_timestamp)))
 

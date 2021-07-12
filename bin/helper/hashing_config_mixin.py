@@ -21,7 +21,7 @@ class HashingConfigMixin(object):
 
     ##################################################################################################
 
-    def read_hashing_config(self):
+    def read_config(self):
         self.__handle_hash_file_block_size()
         self.__handle_hash_file_name_block_size()
 

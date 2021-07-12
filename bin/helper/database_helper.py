@@ -1,16 +1,16 @@
 import sqlite3
+from abc import abstractmethod
 from datetime import timedelta
 from timeit import default_timer as timer
 
 from backports.strenum import StrEnum  # sudo pip install backports.strenum
 
-from .config_file_handler import EvaluationConfiguration
-from .databases_config_mixin import DatabasesConfigMixin
+from .databases_config_mixin import DatabaseConfigMixin
 from .evaluation_config_mixin import EvaluationConfigMixin
 from .file_type import FileType
 
 
-##################################################################################################
+######################################################################################################
 
 
 def convert_file_type_to_sql_entry(file: FileType):
@@ -31,9 +31,70 @@ def convert_file_type_to_sql_entry(file: FileType):
                 file.creation_time)
 
 
+######################################################################################################
+
+class SqliteDbConnector(object):
+    ##################################################################################################
+
+    def __init__(self, database_config: DatabaseConfigMixin):
+        db_path = database_config.get_database_path()
+
+        if db_path is None:
+            raise ValueError("Database path is empty.")
+
+        self.__database_path = db_path  # type: str
+        self.__db_connection = sqlite3.connect(self.__database_path)  # type: sqlite3.Connection
+        self.__db_cursor = self.__db_connection.cursor()  # type: sqlite3.Cursor
+
+    ##################################################################################################
+
+    def cursor(self): return self.__db_cursor
+
+    ##################################################################################################
+
+    def connection(self): return self.__db_connection
+
+    ##################################################################################################
+
+    def database_path(self): return self.__database_path
+
+    ##################################################################################################
+
+    def close(self):
+        self.__db_connection.commit()
+        self.__db_connection.close()
+
+
+######################################################################################################
+
+class IndexDataBaseHelper(SqliteDbConnector):
+    ##################################################################################################
+
+    def __init__(self, database_config: DatabaseConfigMixin, table_name: str):
+        super().__init__(database_config)
+        db_path = database_config.get_database_path()
+
+        if db_path is None:
+            raise ValueError("Database path is empty.")
+
+        self.__table_name = "inp_" + table_name  # type:str
+        self.__database_path = db_path  # type: str
+        self.__db_connection = sqlite3.connect(self.__database_path)
+        self.__db_cursor = self.__db_connection.cursor()
+
+    ##################################################################################################
+
+    def table_name(self): return self.__table_name
+
+    ##################################################################################################
+
+    def drop_all_tables_and_views(self):
+        self.__db_cursor.execute("DROP TABLE IF EXISTS " + self.table_name())
+
+
 ##################################################################################################
 
-class DataBase(object):
+class PrivateDataBase(IndexDataBaseHelper):
     ##################################################################################################
 
     class PrivateIndexTableColumnNames(StrEnum):
@@ -52,6 +113,43 @@ class DataBase(object):
 
     ##################################################################################################
 
+    def __init__(self, database_config: DatabaseConfigMixin, private_index_table_name: str = "priv_index_table"):
+        super().__init__(database_config, table_name=private_index_table_name)
+
+        self.drop_all_tables_and_views()
+        self._create_index_table()
+
+    ##################################################################################################
+
+    def _create_index_table(self):
+        """
+        Helper function that creates the private index table
+        :return:
+        """
+        self.cursor().execute(
+            "CREATE TABLE IF NOT EXISTS " +
+            self.table_name() + " ( " +
+            PrivateDataBase.PrivateIndexTableColumnNames.filename.value + " text NOT NULL, " +
+            PrivateDataBase.PrivateIndexTableColumnNames.file_extension.value + " text, " +
+            PrivateDataBase.PrivateIndexTableColumnNames.file_size_kb.value + " real NOT NULL, " +
+            PrivateDataBase.PrivateIndexTableColumnNames.file_hash_tag.value + " text NOT NULL, " +
+            PrivateDataBase.PrivateIndexTableColumnNames.absolute_path.value + " text NOT NULL, " +
+            PrivateDataBase.PrivateIndexTableColumnNames.relative_path.value + " text NOT NULL, " +
+            PrivateDataBase.PrivateIndexTableColumnNames.absolute_path_hash_tag.value + " text NOT NULL, " +
+            PrivateDataBase.PrivateIndexTableColumnNames.last_modification_time.value + " text NOT NULL, " +
+            PrivateDataBase.PrivateIndexTableColumnNames.creation_time.value + " text NOT NULL, " +
+
+            "PRIMARY KEY ( " +
+            PrivateDataBase.PrivateIndexTableColumnNames.absolute_path_hash_tag.value + " , " +
+            PrivateDataBase.PrivateIndexTableColumnNames.file_hash_tag.value +
+            " ));")
+
+
+##################################################################################################
+
+class PublicDataBase(IndexDataBaseHelper):
+    ##################################################################################################
+
     class PublicIndexTableColumnNames(StrEnum):
         file_hash_tag = "file_hash_tag"
         file_extension = "file_extension"
@@ -62,112 +160,66 @@ class DataBase(object):
 
     ##################################################################################################
 
-    def __init__(self, database_config: DatabasesConfigMixin, index_table_name: str = "index_table"):
-        private_db_path = database_config.get_private_database_path()
-        public_db_path = database_config.get_public_database_path()
-
-        if private_db_path is None or public_db_path is None:
-            # We should never reach this point.
-            raise ValueError("Database path is empty.")
-
-        self.private_index_table_name = "inp_private_" + index_table_name  # type:str
-
-        self.public_index_table_name = "inp_public_" + index_table_name  # type:str
-
-        self._private_database_path = private_db_path  # type: str
-        self._public_database_path = public_db_path  # type: str
-
-        self._public_db_connection = sqlite3.connect(self._public_database_path)
-        self._private_db_connection = sqlite3.connect(self._private_database_path)
-
-        self.private_db_cursor = self._private_db_connection.cursor()
-        self.public_db_cursor = self._public_db_connection.cursor()
-        self.private_db_cursor.execute("ATTACH DATABASE \"" + self._public_database_path + "\" AS public")
+    def __init__(self, database_config: DatabaseConfigMixin, public_index_table_name: str = "pub_index_table"):
+        super().__init__(database_config, table_name=public_index_table_name)
 
         self.drop_all_tables_and_views()
-
-        self.create_public_index_table()
-        self.create_private_index_table()
+        self._create_index_table()
 
     ##################################################################################################
 
-    def create_private_index_table(self):
-        """
-        Helper function that creates the private index table
-        :return:
-        """
-        self.private_db_cursor = self._private_db_connection.cursor()
-        self.private_db_cursor.execute(
-            "CREATE TABLE IF NOT EXISTS " +
-            self.private_index_table_name + " ( " +
-            DataBase.PrivateIndexTableColumnNames.filename.value + " text NOT NULL, " +
-            DataBase.PrivateIndexTableColumnNames.file_extension.value + " text, " +
-            DataBase.PrivateIndexTableColumnNames.file_size_kb.value + " real NOT NULL, " +
-            DataBase.PrivateIndexTableColumnNames.file_hash_tag.value + " text NOT NULL, " +
-            DataBase.PrivateIndexTableColumnNames.absolute_path.value + " text NOT NULL, " +
-            DataBase.PrivateIndexTableColumnNames.relative_path.value + " text NOT NULL, " +
-            DataBase.PrivateIndexTableColumnNames.absolute_path_hash_tag.value + " text NOT NULL, " +
-            DataBase.PrivateIndexTableColumnNames.last_modification_time.value + " text NOT NULL, " +
-            DataBase.PrivateIndexTableColumnNames.creation_time.value + " text NOT NULL, " +
-
-            "PRIMARY KEY ( " +
-            DataBase.PrivateIndexTableColumnNames.absolute_path_hash_tag.value + " , " +
-            DataBase.PrivateIndexTableColumnNames.file_hash_tag.value +
-            " ));")
-
-    ##################################################################################################
-
-    def create_public_index_table(self):
+    def _create_index_table(self):
         """
         Helper function that creates the public index table
         :return:
         """
-        self.public_db_cursor = self._public_db_connection.cursor()
-        self.public_db_cursor.execute(
+        self.cursor().execute(
             "CREATE TABLE IF NOT EXISTS " +
-            self.public_index_table_name + " ( " +
-            DataBase.PublicIndexTableColumnNames.file_hash_tag.value + " text NOT NULL, " +
-            DataBase.PublicIndexTableColumnNames.absolute_path_hash_tag.value + " text NOT NULL, " +
-            DataBase.PublicIndexTableColumnNames.file_extension.value + " text NOT NULL, " +
-            DataBase.PublicIndexTableColumnNames.file_size_kb.value + " text NOT NULL, " +
-            DataBase.PublicIndexTableColumnNames.last_modification_time.value + " text NOT NULL, " +
-            DataBase.PublicIndexTableColumnNames.creation_time.value + " text NOT NULL, " +
+            self.table_name() + " ( " +
+            PublicDataBase.PublicIndexTableColumnNames.file_hash_tag.value + " text NOT NULL, " +
+            PublicDataBase.PublicIndexTableColumnNames.absolute_path_hash_tag.value + " text NOT NULL, " +
+            PublicDataBase.PublicIndexTableColumnNames.file_extension.value + " text NOT NULL, " +
+            PublicDataBase.PublicIndexTableColumnNames.file_size_kb.value + " text NOT NULL, " +
+            PublicDataBase.PublicIndexTableColumnNames.last_modification_time.value + " text NOT NULL, " +
+            PublicDataBase.PublicIndexTableColumnNames.creation_time.value + " text NOT NULL, " +
 
             "PRIMARY KEY ( " +
-            DataBase.PublicIndexTableColumnNames.absolute_path_hash_tag.value + " , " +
-            DataBase.PublicIndexTableColumnNames.file_hash_tag.value +
+            PublicDataBase.PublicIndexTableColumnNames.absolute_path_hash_tag.value + " , " +
+            PublicDataBase.PublicIndexTableColumnNames.file_hash_tag.value +
             " ));")
-
-    ##################################################################################################
-
-    def close_connections(self):
-        self._public_db_connection.commit()
-        self._private_db_connection.commit()
-
-        self._public_db_connection.close()
-        self._private_db_connection.close()
-
-    ##################################################################################################
-
-    def drop_all_tables_and_views(self):
-        """
-        Helper function that drops every table/view in the database
-        :return:
-        """
-        self.private_db_cursor.execute("DROP TABLE IF EXISTS " + self.private_index_table_name)
-        self.public_db_cursor.execute("DROP TABLE IF EXISTS " + self.public_index_table_name)
 
 
 ##################################################################################################
 
+class IndexDataBases(object):
+    ##################################################################################################
 
-class DataBaseIndexHelper(DataBase):
-    """
-    Helper class for writing file information to tables.
-    """
+    def __init__(self, private_db_config: DatabaseConfigMixin,
+                 public_db_config: DatabaseConfigMixin, **kwargs):
+        self.private_db = PrivateDataBase(private_db_config, **kwargs)
+        self.public_db = PublicDataBase(public_db_config, **kwargs)
+        self._dbs = [self.private_db, self.public_db]
 
-    def __init__(self, database_config: DatabasesConfigMixin, index_table_name="index_table"):
-        DataBase.__init__(self, database_config, index_table_name=index_table_name)
+        # Attach the public database to the private db. to allow db-spanning queries by use of the private db cursor.
+        self.private_db.cursor().execute("ATTACH DATABASE \"" + self.public_db.database_path() + "\" AS public")
+
+    ##################################################################################################
+
+    def close(self):  [db.close() for db in self._dbs]
+
+    ##################################################################################################
+
+    def drop_all_tables_and_views(self):  [db.drop_all_tables_and_views() for db in self._dbs]
+
+
+##################################################################################################
+
+class DataBaseIndexHelper(IndexDataBases):
+
+    ##################################################################################################
+
+    def __init__(self, private_db_config: DatabaseConfigMixin, public_db_config: DatabaseConfigMixin, **kwargs):
+        super().__init__(private_db_config, public_db_config, **kwargs)
 
     ##################################################################################################
 
@@ -178,44 +230,40 @@ class DataBaseIndexHelper(DataBase):
         :return:
         """
         print("Storing data sets to private database ...")
-        if len(files) <= 0:
-            return
+        if len(files) > 0:
+            for file in files:
+                self._insert_file_in_private_table(file)
 
-        for file in files:
-            self._insert_file_in_private_table(file)
+            print("Storing data sets to public database ...")
 
-        print("Storing data sets to public database ...")
-
-        self._private_db_connection.execute(
-            "INSERT INTO public." + self.public_index_table_name
-            + " SELECT " +
-            DataBase.PrivateIndexTableColumnNames.file_hash_tag.value + " , " +
-            DataBase.PrivateIndexTableColumnNames.absolute_path_hash_tag.value + " , " +
-            DataBase.PrivateIndexTableColumnNames.file_extension.value + " , " +
-            DataBase.PrivateIndexTableColumnNames.file_size_kb.value + " , " +
-            DataBase.PrivateIndexTableColumnNames.last_modification_time.value + " , " +
-            DataBase.PrivateIndexTableColumnNames.creation_time.value +
-            " FROM " + self.private_index_table_name)
+            self.private_db.connection().execute(
+                "INSERT INTO public." + self.public_db.table_name()
+                + " SELECT " +
+                PrivateDataBase.PrivateIndexTableColumnNames.file_hash_tag.value + " , " +
+                PrivateDataBase.PrivateIndexTableColumnNames.absolute_path_hash_tag.value + " , " +
+                PrivateDataBase.PrivateIndexTableColumnNames.file_extension.value + " , " +
+                PrivateDataBase.PrivateIndexTableColumnNames.file_size_kb.value + " , " +
+                PrivateDataBase.PrivateIndexTableColumnNames.last_modification_time.value + " , " +
+                PrivateDataBase.PrivateIndexTableColumnNames.creation_time.value +
+                " FROM " + self.private_db.table_name())
 
         print("Storing data to database done.")
 
     ##################################################################################################
 
     def _insert_file_in_private_table(self, file: FileType):
-        """
-        Helper function that inserts a single file in the database
-        :param file: FileType object
-        :return:
-        """
         if file is None:
             return
 
         try:
-            self.private_db_cursor.execute("INSERT INTO " + self.private_index_table_name + " VALUES {}"
-                                           .format(convert_file_type_to_sql_entry(file)))
+            self.private_db.cursor().execute(
+                "INSERT INTO " + self.private_db.table_name() +
+                " VALUES {}".format(convert_file_type_to_sql_entry(file)))
         except sqlite3.Error as e:
             print(convert_file_type_to_sql_entry(file))
             raise e
+        except object:
+            assert False
 
     ##################################################################################################
 
@@ -250,29 +298,21 @@ class DataBaseIndexHelper(DataBase):
 
 ######################################################################################################
 
-class DataBaseEvaluationHelper(DataBase):
+class EvaluationDataBases(object):
     ##################################################################################################
-    """
-    Helper class that helps evaluating the file information.
-    """
 
-    def __init__(self, database_config: DatabasesConfigMixin, evaluation_config: EvaluationConfigMixin):
-        DataBase.__init__(self, database_config)
+    def __init__(self, public_index_db_config: DatabaseConfigMixin, evaluation_db_config: DatabaseConfigMixin):
+        self.index_db = PrivateDataBase(public_index_db_config)
+        self.evaluation_db = SqliteDbConnector(evaluation_db_config)
+        self._dbs = [self.index_db, self.evaluation_db]
 
-        evaluation_db_path = evaluation_config.get_evaluation_database_path()
-        if evaluation_db_path is None:
-            raise ValueError("Database path is empty.")
+        # Attach the public database to the private db. to allow db-spanning queries by use of the private db cursor.
+        self.index_db.cursor().execute(
+            "ATTACH DATABASE \"" + self.evaluation_db.database_path() + "\" AS evaluation")
 
-        self._evaluation_database_path = evaluation_db_path  # type: str
-        self._evaluation_db_connection = sqlite3.connect(self._evaluation_database_path)
-        self.evaluation_db_cursor = self._evaluation_db_connection.cursor()
+    ##################################################################################################
 
-        self.public_db_cursor.execute("ATTACH DATABASE \"" + self._evaluation_database_path + "\" AS evaluation")
-
-    def close_connections(self):
-        self._evaluation_db_connection.commit()
-        self._evaluation_db_connection.close()
-        DataBase.close_connections(self)
+    def close(self):  [db.close() for db in self._dbs]
 
 
 ######################################################################################################
@@ -288,8 +328,9 @@ class UniqueFileFolderEvaluator(object):
 
     ##################################################################################################
 
-    def __init__(self, database_helper: DataBaseEvaluationHelper, evaluation_table_name: str = "unique_entities"):
-        self._data_base = database_helper
+    def __init__(self, databases: EvaluationDataBases, evaluation_table_name: str = "unique_entities"):
+        self.index_db = databases.index_db
+        self.evaluation_db = databases.evaluation_db
         self._evaluation_table_name = "eval_" + evaluation_table_name  # type: str
 
     ##################################################################################################
@@ -301,15 +342,15 @@ class UniqueFileFolderEvaluator(object):
         self._create_view_of_unique_files()
         self._create_view_of_unique_folders()
         # TODO - implement: create a real table instead of view (because view is not in same db as data table)
-        assert False
+        # assert False
         print("[UniqueFileFolderEvaluator END] Time elapsed {}".format(timedelta(seconds=timer() - start_timestamp)))
 
     ##################################################################################################
 
     def drop_all_tables_and_views(self):
-        self._data_base.evaluation_db_cursor.execute(
+        self.evaluation_db.cursor().execute(
             "DROP VIEW IF EXISTS " + UniqueFileFolderEvaluator.UNIQUE_FILES_VIEW_NAME)
-        self._data_base.evaluation_db_cursor.execute(
+        self.evaluation_db.cursor().execute(
             "DROP VIEW IF EXISTS " + UniqueFileFolderEvaluator.UNIQUE_FOLDERS_VIEW_NAME)
 
     ##################################################################################################
@@ -320,14 +361,14 @@ class UniqueFileFolderEvaluator(object):
         index table
         :return:
         """
-        self._data_base.evaluation_db_cursor.execute(
+        self.evaluation_db.cursor().execute(
             "CREATE VIEW " + UniqueFileFolderEvaluator.UNIQUE_FILES_VIEW_NAME + " AS " +
             "SELECT DISTINCT " +
-            DataBase.PrivateIndexTableColumnNames.file_hash_tag.value + " , " +
-            DataBase.PrivateIndexTableColumnNames.filename.value + " , " +
-            DataBase.PrivateIndexTableColumnNames.file_extension.value + " , " +
-            DataBase.PrivateIndexTableColumnNames.file_size_kb.value +
-            " FROM " + self._data_base.private_index_table_name)
+            PrivateDataBase.PrivateIndexTableColumnNames.file_hash_tag.value + " , " +
+            PrivateDataBase.PrivateIndexTableColumnNames.filename.value + " , " +
+            PrivateDataBase.PrivateIndexTableColumnNames.file_extension.value + " , " +
+            PrivateDataBase.PrivateIndexTableColumnNames.file_size_kb.value +
+            " FROM " + self.index_db.table_name())
 
     ##################################################################################################
 
@@ -337,12 +378,11 @@ class UniqueFileFolderEvaluator(object):
         index table
         :return:
         """
-        self._data_base.evaluation_db_cursor.execute(
+        self.evaluation_db.cursor().execute(
             "CREATE VIEW " + UniqueFileFolderEvaluator.UNIQUE_FOLDERS_VIEW_NAME + " AS " + "SELECT DISTINCT " +
-            DataBase.PrivateIndexTableColumnNames.absolute_path.value + " , " +
-            DataBase.PrivateIndexTableColumnNames.absolute_path_hash_tag.value +
-            " FROM " +
-            self._data_base.private_index_table_name)
+            PrivateDataBase.PrivateIndexTableColumnNames.absolute_path.value + " , " +
+            PrivateDataBase.PrivateIndexTableColumnNames.absolute_path_hash_tag.value +
+            " FROM " + self.index_db.table_name())
 
 
 ######################################################################################################
@@ -360,9 +400,9 @@ class ExpectedFolderStructureEvaluator(object):
 
     ##################################################################################################
 
-    def __init__(self, database_helper: DataBaseEvaluationHelper,
-                 evaluation_table_name: str = "expected_folder_structure"):
-        self._data_base = database_helper
+    def __init__(self, databases: EvaluationDataBases, evaluation_table_name: str = "expected_folder_structure"):
+        self.index_db = databases.index_db
+        self.evaluation_db = databases.evaluation_db
         self._evaluation_table_name = "eval_" + evaluation_table_name  # type: str
 
     ##################################################################################################
@@ -372,7 +412,7 @@ class ExpectedFolderStructureEvaluator(object):
         start_timestamp = timer()
         self.drop_all_tables_and_views()
         # TODO - implement: create a real table instead of view (because view is not in same db as data table)
-        assert False
+        # assert False
         self._create_view_of_expected_folder_structure()
         print("[ExpectedFolderStructureEvaluator END] Time elapsed {}"
               .format(timedelta(seconds=timer() - start_timestamp)))
@@ -384,23 +424,21 @@ class ExpectedFolderStructureEvaluator(object):
         Helper function that drops every table/view in the database
         :return:
         """
-        self._data_base.evaluation_db_cursor.execute(
+        self.evaluation_db.cursor().execute(
             "DROP VIEW IF EXISTS " + ExpectedFolderStructureEvaluator.EXPECTED_FOLDER_STRUCTURE_VIEW_NAME)
-
-        self._data_base.drop_all_tables_and_views()
 
     ##################################################################################################
 
     def _create_view_of_expected_folder_structure(self):
-        self._data_base.evaluation_db_cursor.execute(
+        self.evaluation_db.cursor().execute(
             "CREATE VIEW " + ExpectedFolderStructureEvaluator.EXPECTED_FOLDER_STRUCTURE_VIEW_NAME +
             " AS SELECT " +
-            " file." + DataBase.PrivateIndexTableColumnNames.filename.value +
-            " , file." + DataBase.PrivateIndexTableColumnNames.file_extension.value +
-            " , file." + DataBase.PrivateIndexTableColumnNames.file_size_kb.value +
-            " , file." + DataBase.PrivateIndexTableColumnNames.file_hash_tag.value +
-            " , folder." + DataBase.PrivateIndexTableColumnNames.absolute_path.value +
-            " , folder." + DataBase.PrivateIndexTableColumnNames.absolute_path_hash_tag.value +
+            " file." + PrivateDataBase.PrivateIndexTableColumnNames.filename.value +
+            " , file." + PrivateDataBase.PrivateIndexTableColumnNames.file_extension.value +
+            " , file." + PrivateDataBase.PrivateIndexTableColumnNames.file_size_kb.value +
+            " , file." + PrivateDataBase.PrivateIndexTableColumnNames.file_hash_tag.value +
+            " , folder." + PrivateDataBase.PrivateIndexTableColumnNames.absolute_path.value +
+            " , folder." + PrivateDataBase.PrivateIndexTableColumnNames.absolute_path_hash_tag.value +
             " FROM " + UniqueFileFolderEvaluator.UNIQUE_FOLDERS_VIEW_NAME + " AS folder CROSS JOIN " +
             UniqueFileFolderEvaluator.UNIQUE_FILES_VIEW_NAME + " AS file")
 
@@ -417,18 +455,15 @@ class TODOEvaluator(object):
     Helper class that helps evaluating the file information.
     """
 
-    def __init__(self, database_helper: DataBaseEvaluationHelper,
-                 evaluation_table_name: str = "expected_folder_structure"):
-        self.drop_all_tables_and_views()
-
-        self._data_base = database_helper
+    def __init__(self, databases: EvaluationDataBases, evaluation_table_name: str = "expected_folder_structure"):
+        self.index_db = databases.index_db
+        self.evaluation_db = databases.evaluation_db
         self._evaluation_table_name = "eval_" + evaluation_table_name  # type: str
 
     ##################################################################################################
 
     def evaluate(self):
         self.drop_all_tables_and_views()
-        self._data_base.drop_all_tables_and_views()
 
     ##################################################################################################
 

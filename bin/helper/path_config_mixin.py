@@ -16,7 +16,7 @@ class PathConfigMixin(object):
 
     ##################################################################################################
 
-    def read_folder_config(self):
+    def read_config(self):
         self.__handle_paths_list()
 
         print("[{}]".format(PathConfigMixin.PATHS_SECTION_NAME))

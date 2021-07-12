@@ -1,77 +1,45 @@
 import os
 from configparser import ConfigParser
-from enum import Enum
-from pathlib import Path
 
 
 ##################################################################################################
 
-class DatabasesConfigMixin(object):
-    ##################################################################################################
-
-    class DatabaseType(Enum):
-        PRIVATE = 0,
-        PUBLIC = 1
+class DatabaseConfigMixin(object):
 
     ##################################################################################################
-    SECTION_NAME = "databases"
 
-    PRIVATE_DB_CONFIG_FIELD_NAME = "private_database_file_path"
-    PUBLIC_DB_CONFIG_FIELD_NAME = "public_database_file_path"
-
-    DEFAULT_PRIVATE_DB_NAME = "private_database.sqlite"
-    DEFAULT_PUBLIC_DB_NAME = "public_database.sqlite"
-
-    ##################################################################################################
-    def __init__(self, config_parser: ConfigParser):
+    def __init__(self, config_parser: ConfigParser,
+                 section_name: str = "private_index_db",
+                 field_name: str = "database_file_path",
+                 default_db_name: str = "private_database.sqlite"):
         self._parser = config_parser  # type: ConfigParser
 
-        self._private_database_file_path = ""  # type: str
-        self._public_database_file_path = ""  # type: str
+        self._section_name = section_name
+        self._field_name = field_name
+        self._database_file_path = ""
+        self._default_database_name = default_db_name
 
     ##################################################################################################
 
-    def read_dbs_config(self):
-        self.__handle_database_path(self.DatabaseType.PRIVATE)
-        self.__handle_database_path(self.DatabaseType.PUBLIC)
+    def read_config(self):
+        self.__handle_database_path()
 
-        print("[{}]".format(DatabasesConfigMixin.SECTION_NAME))
-        print("\t{} = '{}'".format(DatabasesConfigMixin.PRIVATE_DB_CONFIG_FIELD_NAME, self._private_database_file_path))
-        print("\t{} = '{}'".format(DatabasesConfigMixin.PUBLIC_DB_CONFIG_FIELD_NAME, self._public_database_file_path))
+        print("[{}]".format(self._section_name))
+        print("\t{} = '{}'".format(self._field_name, self._database_file_path))
 
     ##################################################################################################
 
-    def get_private_database_path(self):
-        return self._private_database_file_path
+    def get_database_path(self):
+        return self._database_file_path
 
     ##################################################################################################
 
-    def get_public_database_path(self):
-        return self._public_database_file_path
-
-    ##################################################################################################
-
-    def __handle_database_path(self, database_type: DatabaseType):
-        """
-        Private helper function that can handle DB paths as listed in the config file.
-        It checks if the respective parameter is set. If not, the default database name/location will be used.
-        """
-        if database_type == DatabasesConfigMixin.DatabaseType.PRIVATE:
-            config_field = DatabasesConfigMixin.PRIVATE_DB_CONFIG_FIELD_NAME
-            db_default_path = DatabasesConfigMixin.DEFAULT_PRIVATE_DB_NAME
-        elif database_type == DatabasesConfigMixin.DatabaseType.PUBLIC:
-            config_field = DatabasesConfigMixin.PUBLIC_DB_CONFIG_FIELD_NAME
-            db_default_path = DatabasesConfigMixin.DEFAULT_PUBLIC_DB_NAME
-        else:
-            assert False
-
-        actual_db_path = get_configured_db_file_path(self._parser, DatabasesConfigMixin.SECTION_NAME, config_field,
-                                                     db_default_path)
-
-        if database_type == DatabasesConfigMixin.DatabaseType.PRIVATE:
-            self._private_database_file_path = actual_db_path
-        if database_type == DatabasesConfigMixin.DatabaseType.PUBLIC:
-            self._public_database_file_path = actual_db_path
+    def __handle_database_path(self):
+        self._database_file_path = get_configured_db_file_path(
+            self._parser,
+            self._section_name,
+            self._field_name,
+            self._default_database_name)
 
 
 ######################################################################################################

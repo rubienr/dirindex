@@ -4,7 +4,7 @@ from timeit import default_timer as timer
 from typing import List, Union
 
 from helper.config_file_handler import EvaluationConfiguration
-from helper.database_helper import DataBaseEvaluationHelper, UniqueFileFolderEvaluator, ExpectedFolderStructureEvaluator
+from helper.database_helper import EvaluationDataBases, UniqueFileFolderEvaluator, ExpectedFolderStructureEvaluator
 
 
 ##################################################################################################
@@ -22,15 +22,14 @@ def main():
     cfg = EvaluationConfiguration(args.cfg_file[0])
     cfg.read_config()
 
-    database = DataBaseEvaluationHelper(cfg, cfg)
-    evaluators = [UniqueFileFolderEvaluator(database), ExpectedFolderStructureEvaluator(
-        database)]  # type: List[Union[UniqueFileFolderEvaluator, ExpectedFolderStructureEvaluator]]
+    database = EvaluationDataBases(cfg.public_index_db_cfg, cfg.evaluation_db_cfg)
+    evaluators = [UniqueFileFolderEvaluator(database), ExpectedFolderStructureEvaluator(database)]
 
     try:
         start_timestamp = timer()
         [e.evaluate() for e in evaluators]
     finally:
-        database.close_connections()
+        database.close()
 
     print("\nOverall elapsed time {}.".format(timedelta(seconds=timer() - start_timestamp)))
 

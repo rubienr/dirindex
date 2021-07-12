@@ -86,8 +86,7 @@ class DirectoryIndexer:
 
         print("\n[DATABASE TRANSACTIONS START]")
         start_timestamp = timer()
-        if len(self.files_found_in_directories) > 0:
-            database.insert_files_in_both_databases(self.files_found_in_directories)
+        database.insert_files_in_both_databases(self.files_found_in_directories)
         print("[DATABASE TRANSACTIONS END] Time elapsed {}.".format(timedelta(seconds=timer() - start_timestamp)))
 
     ##################################################################################################
