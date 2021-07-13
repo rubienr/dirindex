@@ -12,8 +12,9 @@ function main()
   if [ "x$config_name" == "x" ] ; then
     config_file="example_config"
   fi
+  shift
 
-   /bin/python3 $SCRIPT_PATH/bin/evaluate-unique.py --configuration_file $SCRIPT_PATH/configurations/${config_name}.cfg
+  /bin/python3 $SCRIPT_PATH/bin/evaluate-unique.py --configuration_file $SCRIPT_PATH/configurations/${config_name}.cfg ${@}
 }
 
 if [ "x$EXECUTE" == "x1" ] ; then

@@ -19,7 +19,7 @@ def convert_file_type_to_sql_entry(file: FileType):
     :param file: FileType object
     :return:
     """
-    return "('{}','{}','{}','{}','{}','{}','{}','{}','{}')" \
+    return "('{}','{}','{}','{}','{}','{}','{}','{}','{}','{}')" \
         .format(file.filename,
                 file.file_extension,
                 file.file_size_kb,
@@ -27,6 +27,7 @@ def convert_file_type_to_sql_entry(file: FileType):
                 file.absolute_path,
                 file.relative_path,
                 file.absolute_path_hash_tag,
+                file.relative_path_hash_tag,
                 file.last_modified_time,
                 file.creation_time)
 
@@ -107,6 +108,7 @@ class PrivateDataBase(IndexDataBaseHelper):
         file_extension = "file_extension"
         file_hash_tag = "file_hash_tag"
         absolute_path_hash_tag = "abs_path_hash_tag"
+        relative_path_hash_tag = "rel_path_hash_tag"
         file_size_kb = "file_size_kb"
         last_modification_time = "last_modification_time"
         creation_time = "creation_time"
@@ -116,6 +118,9 @@ class PrivateDataBase(IndexDataBaseHelper):
     def __init__(self, database_config: DatabaseConfigMixin, private_index_table_name: str = "priv_index_table"):
         super().__init__(database_config, table_name=private_index_table_name)
 
+    ##################################################################################################
+
+    def reset(self):
         self.drop_all_tables_and_views()
         self._create_index_table()
 
@@ -136,6 +141,7 @@ class PrivateDataBase(IndexDataBaseHelper):
             PrivateDataBase.PrivateIndexTableColumnNames.absolute_path.value + " text NOT NULL, " +
             PrivateDataBase.PrivateIndexTableColumnNames.relative_path.value + " text NOT NULL, " +
             PrivateDataBase.PrivateIndexTableColumnNames.absolute_path_hash_tag.value + " text NOT NULL, " +
+            PrivateDataBase.PrivateIndexTableColumnNames.relative_path_hash_tag.value + " text NOT NULL, " +
             PrivateDataBase.PrivateIndexTableColumnNames.last_modification_time.value + " text NOT NULL, " +
             PrivateDataBase.PrivateIndexTableColumnNames.creation_time.value + " text NOT NULL, " +
 
@@ -157,12 +163,16 @@ class PublicDataBase(IndexDataBaseHelper):
         last_modification_time = "last_modification_time"
         creation_time = "creation_time"
         absolute_path_hash_tag = "abs_path_hash_tag"
+        relative_path_hash_tag = "rel_path_hash_tag"
 
     ##################################################################################################
 
     def __init__(self, database_config: DatabaseConfigMixin, public_index_table_name: str = "pub_index_table"):
         super().__init__(database_config, table_name=public_index_table_name)
 
+    ##################################################################################################
+
+    def reset(self):
         self.drop_all_tables_and_views()
         self._create_index_table()
 
@@ -178,6 +188,7 @@ class PublicDataBase(IndexDataBaseHelper):
             self.table_name() + " ( " +
             PublicDataBase.PublicIndexTableColumnNames.file_hash_tag.value + " text NOT NULL, " +
             PublicDataBase.PublicIndexTableColumnNames.absolute_path_hash_tag.value + " text NOT NULL, " +
+            PublicDataBase.PublicIndexTableColumnNames.relative_path_hash_tag.value + " text NOT NULL, " +
             PublicDataBase.PublicIndexTableColumnNames.file_extension.value + " text NOT NULL, " +
             PublicDataBase.PublicIndexTableColumnNames.file_size_kb.value + " text NOT NULL, " +
             PublicDataBase.PublicIndexTableColumnNames.last_modification_time.value + " text NOT NULL, " +
@@ -209,6 +220,10 @@ class IndexDataBases(object):
 
     ##################################################################################################
 
+    def reset(self):  [db.reset() for db in self._dbs]
+
+    ##################################################################################################
+
     def drop_all_tables_and_views(self):  [db.drop_all_tables_and_views() for db in self._dbs]
 
 
@@ -220,6 +235,7 @@ class DataBaseIndexHelper(IndexDataBases):
 
     def __init__(self, private_db_config: DatabaseConfigMixin, public_db_config: DatabaseConfigMixin, **kwargs):
         super().__init__(private_db_config, public_db_config, **kwargs)
+        self.reset()
 
     ##################################################################################################
 
@@ -241,6 +257,7 @@ class DataBaseIndexHelper(IndexDataBases):
                 + " SELECT " +
                 PrivateDataBase.PrivateIndexTableColumnNames.file_hash_tag.value + " , " +
                 PrivateDataBase.PrivateIndexTableColumnNames.absolute_path_hash_tag.value + " , " +
+                PrivateDataBase.PrivateIndexTableColumnNames.relative_path_hash_tag.value + " , " +
                 PrivateDataBase.PrivateIndexTableColumnNames.file_extension.value + " , " +
                 PrivateDataBase.PrivateIndexTableColumnNames.file_size_kb.value + " , " +
                 PrivateDataBase.PrivateIndexTableColumnNames.last_modification_time.value + " , " +
@@ -302,13 +319,13 @@ class EvaluationDataBases(object):
     ##################################################################################################
 
     def __init__(self, public_index_db_config: DatabaseConfigMixin, evaluation_db_config: DatabaseConfigMixin):
-        self.index_db = PrivateDataBase(public_index_db_config)
+        self.index_db = PublicDataBase(public_index_db_config)
         self.evaluation_db = SqliteDbConnector(evaluation_db_config)
         self._dbs = [self.index_db, self.evaluation_db]
 
         # Attach the public database to the private db. to allow db-spanning queries by use of the private db cursor.
-        self.index_db.cursor().execute(
-            "ATTACH DATABASE \"" + self.evaluation_db.database_path() + "\" AS evaluation")
+        self.evaluation_db.cursor().execute(
+            "ATTACH DATABASE \"" + self.index_db.database_path() + "\" AS index_db")
 
     ##################################################################################################
 
@@ -323,8 +340,8 @@ class UniqueFileFolderEvaluator(object):
     """
     ##################################################################################################
 
-    UNIQUE_FILES_VIEW_NAME = "unique_files"
-    UNIQUE_FOLDERS_VIEW_NAME = "unique_folders"
+    UNIQUE_FILES_TABLE_NAME = "unique_files"
+    UNIQUE_FOLDERS_TABLE_NAME = "unique_folders"
 
     ##################################################################################################
 
@@ -338,51 +355,66 @@ class UniqueFileFolderEvaluator(object):
     def evaluate(self):
         print("\n[UniqueFileFolderEvaluator START]")
         start_timestamp = timer()
-        self.drop_all_tables_and_views()
-        self._create_view_of_unique_files()
-        self._create_view_of_unique_folders()
-        # TODO - implement: create a real table instead of view (because view is not in same db as data table)
-        # assert False
+
+        self.reset()
+        self._insert_into_table_of_unique_files()
+        self._insert_into_table_of_unique_folders()
+
         print("[UniqueFileFolderEvaluator END] Time elapsed {}".format(timedelta(seconds=timer() - start_timestamp)))
 
     ##################################################################################################
 
-    def drop_all_tables_and_views(self):
-        self.evaluation_db.cursor().execute(
-            "DROP VIEW IF EXISTS " + UniqueFileFolderEvaluator.UNIQUE_FILES_VIEW_NAME)
-        self.evaluation_db.cursor().execute(
-            "DROP VIEW IF EXISTS " + UniqueFileFolderEvaluator.UNIQUE_FOLDERS_VIEW_NAME)
+    def reset(self):
+        self._drop_all_tables_and_views()
+        self._create_table_of_unique_files()
+        self._create_table_of_unique_folders()
 
     ##################################################################################################
 
-    def _create_view_of_unique_files(self):
-        """
-        Helper function that creates a view in the private database that contains all the unique files found in the
-        index table
-        :return:
-        """
+    def _drop_all_tables_and_views(self):
         self.evaluation_db.cursor().execute(
-            "CREATE VIEW " + UniqueFileFolderEvaluator.UNIQUE_FILES_VIEW_NAME + " AS " +
-            "SELECT DISTINCT " +
-            PrivateDataBase.PrivateIndexTableColumnNames.file_hash_tag.value + " , " +
-            PrivateDataBase.PrivateIndexTableColumnNames.filename.value + " , " +
-            PrivateDataBase.PrivateIndexTableColumnNames.file_extension.value + " , " +
-            PrivateDataBase.PrivateIndexTableColumnNames.file_size_kb.value +
-            " FROM " + self.index_db.table_name())
+            "DROP TABLE IF EXISTS " + UniqueFileFolderEvaluator.UNIQUE_FILES_TABLE_NAME)
+        self.evaluation_db.cursor().execute(
+            "DROP TABLE IF EXISTS " + UniqueFileFolderEvaluator.UNIQUE_FOLDERS_TABLE_NAME)
 
     ##################################################################################################
 
-    def _create_view_of_unique_folders(self):
-        """
-        Helper function that creates a view in the private database that contains all the unique folders found in the
-        index table
-        :return:
-        """
+    def _create_table_of_unique_files(self):
         self.evaluation_db.cursor().execute(
-            "CREATE VIEW " + UniqueFileFolderEvaluator.UNIQUE_FOLDERS_VIEW_NAME + " AS " + "SELECT DISTINCT " +
-            PrivateDataBase.PrivateIndexTableColumnNames.absolute_path.value + " , " +
-            PrivateDataBase.PrivateIndexTableColumnNames.absolute_path_hash_tag.value +
-            " FROM " + self.index_db.table_name())
+            "CREATE TABLE IF NOT EXISTS " + UniqueFileFolderEvaluator.UNIQUE_FILES_TABLE_NAME + " ( " +
+            PublicDataBase.PublicIndexTableColumnNames.file_hash_tag.value + " text NOT NULL, " +
+            "count INTEGER NOT NULL " +
+            " );")
+
+
+    ##################################################################################################
+
+    def _insert_into_table_of_unique_files(self):
+        self.evaluation_db.cursor().execute(
+            "INSERT INTO " + UniqueFileFolderEvaluator.UNIQUE_FILES_TABLE_NAME +
+            " SELECT " + PrivateDataBase.PrivateIndexTableColumnNames.file_hash_tag.value + "," +
+            " COUNT(" + PrivateDataBase.PrivateIndexTableColumnNames.file_hash_tag.value + ")" +
+            " FROM index_db." + self.index_db.table_name() +
+            " GROUP BY " + PrivateDataBase.PrivateIndexTableColumnNames.file_hash_tag.value)
+
+    ##################################################################################################
+
+    def _create_table_of_unique_folders(self):
+        self.evaluation_db.cursor().execute(
+            "CREATE TABLE IF NOT EXISTS " + UniqueFileFolderEvaluator.UNIQUE_FOLDERS_TABLE_NAME + " ( " +
+            PublicDataBase.PublicIndexTableColumnNames.relative_path_hash_tag.value + " text NOT NULL, " +
+            "count INTEGER NOT NULL " +
+            " );")
+
+    ##################################################################################################
+
+    def _insert_into_table_of_unique_folders(self):
+        self.evaluation_db.cursor().execute(
+            "INSERT INTO " + UniqueFileFolderEvaluator.UNIQUE_FOLDERS_TABLE_NAME +
+            " SELECT " + PrivateDataBase.PrivateIndexTableColumnNames.relative_path_hash_tag.value + "," +
+            " COUNT(" + PrivateDataBase.PrivateIndexTableColumnNames.relative_path_hash_tag.value + ") " +
+            " FROM index_db." + self.index_db.table_name() +
+            " GROUP BY " + PrivateDataBase.PrivateIndexTableColumnNames.relative_path_hash_tag.value)
 
 
 ######################################################################################################
@@ -394,9 +426,7 @@ class ExpectedFolderStructureEvaluator(object):
     """
     ##################################################################################################
 
-    UNIQUE_FILES_VIEW_NAME = "unique_files"
-    UNIQUE_FOLDERS_VIEW_NAME = "unique_folders"
-    EXPECTED_FOLDER_STRUCTURE_VIEW_NAME = "expected_folder_structure"
+    EXPECTED_FOLDER_STRUCTURE_TABLE_NAME = "expected_folder_structure"
 
     ##################################################################################################
 
@@ -410,38 +440,66 @@ class ExpectedFolderStructureEvaluator(object):
     def evaluate(self):
         print("\n[ExpectedFolderStructureEvaluator START]")
         start_timestamp = timer()
-        self.drop_all_tables_and_views()
-        # TODO - implement: create a real table instead of view (because view is not in same db as data table)
-        # assert False
-        self._create_view_of_expected_folder_structure()
+
+        self.reset()
+        self._insert_into_table_of_expected_folder_structure()
+
         print("[ExpectedFolderStructureEvaluator END] Time elapsed {}"
               .format(timedelta(seconds=timer() - start_timestamp)))
 
     ##################################################################################################
 
-    def drop_all_tables_and_views(self):
-        """
-        Helper function that drops every table/view in the database
-        :return:
-        """
-        self.evaluation_db.cursor().execute(
-            "DROP VIEW IF EXISTS " + ExpectedFolderStructureEvaluator.EXPECTED_FOLDER_STRUCTURE_VIEW_NAME)
+    def reset(self):
+        self.drop_all_tables_and_views()
+        self._create_table_of_expected_folder_structure()
 
     ##################################################################################################
 
-    def _create_view_of_expected_folder_structure(self):
+    def drop_all_tables_and_views(self):
         self.evaluation_db.cursor().execute(
-            "CREATE VIEW " + ExpectedFolderStructureEvaluator.EXPECTED_FOLDER_STRUCTURE_VIEW_NAME +
-            " AS SELECT " +
-            " file." + PrivateDataBase.PrivateIndexTableColumnNames.filename.value +
-            " , file." + PrivateDataBase.PrivateIndexTableColumnNames.file_extension.value +
-            " , file." + PrivateDataBase.PrivateIndexTableColumnNames.file_size_kb.value +
-            " , file." + PrivateDataBase.PrivateIndexTableColumnNames.file_hash_tag.value +
-            " , folder." + PrivateDataBase.PrivateIndexTableColumnNames.absolute_path.value +
-            " , folder." + PrivateDataBase.PrivateIndexTableColumnNames.absolute_path_hash_tag.value +
-            " FROM " + UniqueFileFolderEvaluator.UNIQUE_FOLDERS_VIEW_NAME + " AS folder CROSS JOIN " +
-            UniqueFileFolderEvaluator.UNIQUE_FILES_VIEW_NAME + " AS file")
+            "DROP TABLE IF EXISTS " + ExpectedFolderStructureEvaluator.EXPECTED_FOLDER_STRUCTURE_TABLE_NAME)
 
+    ##################################################################################################
+
+    def _create_table_of_expected_folder_structure(self):
+        self.evaluation_db.cursor().execute(
+            "CREATE TABLE IF NOT EXISTS " + ExpectedFolderStructureEvaluator.EXPECTED_FOLDER_STRUCTURE_TABLE_NAME +
+            " ( " +
+            PrivateDataBase.PrivateIndexTableColumnNames.file_hash_tag.value + " text NOT NULL, " +
+            PrivateDataBase.PrivateIndexTableColumnNames.relative_path_hash_tag.value + " text NOT NULL " +
+            " );")
+
+    ##################################################################################################
+
+    def _insert_into_table_of_expected_folder_structure(self):
+        # TODO - this query explodes the data too much. Suggestion:
+        # TODO - 1. select distinct the file content hash as distinct_files
+        # TODO - 2. left join the index table on distinct_files
+        # TODO - 3. remove duplicates (duplicate relative folders)
+
+        """
+        select distinct C.rel_path_hash_tag, C.file_hash_tag, C.cnt from
+        (select
+            *
+        from
+            (select
+                file_hash_tag,
+                count(file_hash_tag) as cnt
+            from
+                inp_priv_index_table
+            GROUP by file_hash_tag ) AS A
+        left join
+            (select rel_path_hash_tag, file_hash_tag from inp_priv_index_table ) as B on
+            B.file_hash_tag = A.file_hash_tag) AS c
+        """
+
+        self.evaluation_db.cursor().execute(
+            "INSERT INTO " + ExpectedFolderStructureEvaluator.EXPECTED_FOLDER_STRUCTURE_TABLE_NAME +
+            " SELECT " +
+            "  file." + PrivateDataBase.PrivateIndexTableColumnNames.file_hash_tag.value + ", "
+            "  folder." + PrivateDataBase.PrivateIndexTableColumnNames.relative_path_hash_tag.value +
+            " FROM " + UniqueFileFolderEvaluator.UNIQUE_FOLDERS_TABLE_NAME + " AS folder " +
+            " CROSS JOIN " + UniqueFileFolderEvaluator.UNIQUE_FILES_TABLE_NAME + " AS file")
 
 ######################################################################################################
 

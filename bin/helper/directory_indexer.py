@@ -24,13 +24,10 @@ def calculate_hash(file_path: str, block_size: int = 10240, hash_content=True):
     :param hash_content: Hash the file content (True) or the file_path string (False)
     :return: 
     """
-
     hash_sum = hashlib.md5()
 
     if not hash_content:
         hash_sum.update(file_path.encode())
-    if os.path.isdir(file_path):
-        assert False
     else:
         with open(file_path, "rb") as f:
             for block in iter(lambda: f.read(block_size), b""):
@@ -101,7 +98,7 @@ class DirectoryIndexer:
         num_total_processed_files = 0
         num_total_folders = 0
 
-        with concurrent.futures.ProcessPoolExecutor() as executor:
+        with concurrent.futures.ProcessPoolExecutor(max_workers=1) as executor:
             for root_directory in self._directory_list:
                 fs = []
                 num_processed_files = 0
@@ -167,6 +164,7 @@ def _generate_file_information(root_directory: str, relative_directory: str, fil
     return FileType(
         absolute_path=root_directory,
         absolute_path_hash_tag=calculate_hash(file_absolute_path, hash_file_name_block_size, hash_content=False),
+        relative_path_hash_tag=calculate_hash(relative_directory, hash_file_name_block_size, hash_content=False),
         relative_path=relative_directory,
         filename=file_name.split('.')[0],
         file_extension=file_name.split('.')[-1],

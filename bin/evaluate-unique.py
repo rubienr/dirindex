@@ -17,6 +17,12 @@ def main():
                         metavar="Configuration",
                         help="Path to the configuration file to be loaded. "
                              "An example Configuration can be found in the 'configurations' folder.")
+
+    parser.add_argument("-r", "--reset_tables",
+                        required=False, action="store_true", dest="do_reset_tables",
+
+                        help="Drop and re-create empty all evaluation tables.")
+
     args = parser.parse_args()
 
     cfg = EvaluationConfiguration(args.cfg_file[0])
@@ -27,7 +33,10 @@ def main():
 
     try:
         start_timestamp = timer()
-        [e.evaluate() for e in evaluators]
+        if not args.do_reset_tables:
+            [e.evaluate() for e in evaluators]
+        else:
+            [e.reset() for e in evaluators]
     finally:
         database.close()
 
