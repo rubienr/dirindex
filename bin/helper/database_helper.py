@@ -2,6 +2,7 @@ import sqlite3
 from abc import abstractmethod
 from datetime import timedelta
 from timeit import default_timer as timer
+from typing import List, Tuple
 
 from backports.strenum import StrEnum  # sudo pip install backports.strenum
 
@@ -12,23 +13,46 @@ from .file_type import FileType
 ######################################################################################################
 
 
-def convert_file_type_to_sql_entry(file: FileType):
+def convert_file_type_to_sql_entry(file: FileType) -> str:
     """
     Helper function that converts a FileType object to the SQL row entry
-    :param file: FileType object
-    :return:
     """
-    return "('{}','{}','{}','{}','{}','{}','{}','{}','{}','{}')" \
-        .format(file.filename,
-                file.file_extension,
-                file.file_size_kb,
-                file.file_hash_tag,
-                file.absolute_path,
+    return "('{}','{}','{}','{}','{}','{}','{}','{}','{}','{}','{}','{}','{}')" \
+        .format(file.root_path,
                 file.relative_path,
-                file.absolute_path_hash_tag,
+                file.filename,
+                file.file_extension,
+                file.file_mime_type,
+                file.root_path_hash_tag,
                 file.relative_path_hash_tag,
-                file.last_modified_time,
-                file.creation_time)
+                file.filename_hash_tag,
+                file.absolute_file_path_hash_tag,
+                file.file_content_hash_tag,
+                file.creation_time,
+                file.last_modification_time,
+                file.file_size)
+
+
+######################################################################################################
+
+def convert_file_type_list_to_tuple_list(files: List[FileType]) \
+        -> List[Tuple[str, str, str, str, str, str, str, str, str, str, str, str, int]]:
+    """
+    Helper function that converts a List[FileType] to List[Tuple] for sqlite3.cursor.executemany().
+    """
+    return [(f.root_path,
+             f.relative_path,
+             f.filename,
+             f.file_extension,
+             f.file_mime_type,
+             f.root_path_hash_tag,
+             f.relative_path_hash_tag,
+             f.filename_hash_tag,
+             f.absolute_file_path_hash_tag,
+             f.file_content_hash_tag,
+             f.creation_time,
+             f.last_modification_time,
+             f.file_size) for f in files]
 
 
 ######################################################################################################
@@ -98,16 +122,19 @@ class PrivateDataBase(IndexDataBaseHelper):
         """
         Enum containing all the column names in the private index table.
         """
-        absolute_path = "absolute_path"
+        root_path = "absolute_path"
         relative_path = "relative_path"
         filename = "filename"
         file_extension = "file_extension"
-        file_hash_tag = "file_hash_tag"
-        absolute_path_hash_tag = "abs_path_hash_tag"
+        file_mime_type = "file_mime_type"
+        root_path_hash_tag = "root_path_hash_tag"
         relative_path_hash_tag = "rel_path_hash_tag"
-        file_size_kb = "file_size_kb"
-        last_modification_time = "last_modification_time"
+        filename_hash_tag = "filename_hash_tag"
+        absolute_file_path_hash_tag = "absolute_file_path_hash_tag"
+        file_content_hash_tag = "file_content_hash_tag"
         creation_time = "creation_time"
+        last_modification_time = "last_modification_time"
+        file_size = "file_size"
 
     ##################################################################################################
 
@@ -126,36 +153,47 @@ class PrivateDataBase(IndexDataBaseHelper):
         q = """
         CREATE TABLE IF NOT EXISTS {tbl} 
         (
-            {fname} TEXT NOT NULL,
-            {fext} TEXT NOT NULL,
-            {fsize} REAL NOT NULL,
-            {fht} TEXT NOT NULL,
-            {pabs} TEXT NOT NULL,
+            {proot} TEXT NOT NULL,
             {prel} TEXT NOT NULL,
-            {pabsht} TEXT NOT NULL,
-            {prelht} TEXT NOT NULL,
-            {mtime} TEXT NOT NULL,
+            {fname} TEXT NOT NULL,
+            {fext} TEXT,
+            {fmime} TEXT,
+
+            {prooth} TEXT NOT NULL,
+            {prelh} TEXT NOT NULL,
+            {fnameh} TEXT NOT NULL,
+            {pabsfnameh} TEXT NOT NULL,
+            {fconth} TEXT NOT NULL,
+
             {ctime} TEXT NOT NULL,
+            {mtime} TEXT NOT NULL,
+            {fsize} INTEGER NOT NULL,
 
             PRIMARY KEY
             (
-                {pabsht},
-                {fht}
+                {prooth},
+                {prelh},
+                {fnameh}
             )
         )
         """.format(
             tbl=self.table_name(),
+
+            proot=PrivateDataBase.PrivateIndexTableColumnNames.root_path.value,
+            prel=PrivateDataBase.PrivateIndexTableColumnNames.relative_path.value,
             fname=PrivateDataBase.PrivateIndexTableColumnNames.filename.value,
             fext=PrivateDataBase.PrivateIndexTableColumnNames.file_extension.value,
-            fsize=PrivateDataBase.PrivateIndexTableColumnNames.file_size_kb.value,
-            fht=PrivateDataBase.PrivateIndexTableColumnNames.file_hash_tag.value,
-            pabs=PrivateDataBase.PrivateIndexTableColumnNames.absolute_path.value,
-            prel=PrivateDataBase.PrivateIndexTableColumnNames.relative_path.value,
-            pabsht=PrivateDataBase.PrivateIndexTableColumnNames.absolute_path_hash_tag.value,
-            prelht=PrivateDataBase.PrivateIndexTableColumnNames.relative_path_hash_tag.value,
-            mtime=PrivateDataBase.PrivateIndexTableColumnNames.last_modification_time.value,
-            ctime=PrivateDataBase.PrivateIndexTableColumnNames.creation_time.value
+            fmime=PrivateDataBase.PrivateIndexTableColumnNames.file_mime_type.value,
 
+            prooth=PrivateDataBase.PrivateIndexTableColumnNames.root_path_hash_tag.value,
+            prelh=PrivateDataBase.PrivateIndexTableColumnNames.relative_path_hash_tag.value,
+            fnameh=PrivateDataBase.PrivateIndexTableColumnNames.filename_hash_tag.value,
+            pabsfnameh=PrivateDataBase.PrivateIndexTableColumnNames.absolute_file_path_hash_tag.value,
+            fconth=PrivateDataBase.PrivateIndexTableColumnNames.file_content_hash_tag.value,
+
+            ctime=PrivateDataBase.PrivateIndexTableColumnNames.creation_time.value,
+            mtime=PrivateDataBase.PrivateIndexTableColumnNames.last_modification_time.value,
+            fsize=PrivateDataBase.PrivateIndexTableColumnNames.file_size.value
         )
         self.cursor().execute(q)
 
@@ -169,13 +207,14 @@ class PublicDataBase(IndexDataBaseHelper):
         """
         Enum containing all the column names in the public index table.
         """
-        file_hash_tag = "file_hash_tag"
-        file_extension = "file_extension"
-        file_size_kb = "file_size_kb"
-        last_modification_time = "last_modification_time"
-        creation_time = "creation_time"
-        absolute_path_hash_tag = "abs_path_hash_tag"
+        root_path_hash_tag = "root_path_hash_tag"
         relative_path_hash_tag = "rel_path_hash_tag"
+        filename_hash_tag = "filename_hash_tag"
+        absolute_file_path_hash_tag = "absolute_file_path_hash_tag"
+        file_content_hash_tag = "file_content_hash_tag"
+        creation_time = "creation_time"
+        last_modification_time = "last_modification_time"
+        file_size = "file_size"
 
     ##################################################################################################
 
@@ -192,31 +231,38 @@ class PublicDataBase(IndexDataBaseHelper):
 
     def _create_index_table(self):
         q = """
-        CREATE TABLE IF NOT EXISTS  {tbl} 
-        (
-            {fht} TEXT NOT NULL,
-            {pabsht} TEXT NOT NULL,
-            {prelht} TEXT NOT NULL,
-            {fext} TEXT NOT NULL,
-            {fsize} TEXT NOT NULL,
-            {mtime} TEXT NOT NULL,
-            {ctime} TEXT NOT NULL,
+          CREATE TABLE IF NOT EXISTS {tbl} 
+          (                
+              {prooth} TEXT NOT NULL,
+              {prelh} TEXT NOT NULL,
+              {fnameh} TEXT NOT NULL,
+              {pabsfnameh} TEXT NOT NULL,
+              {fconth} TEXT NOT NULL,
 
-            PRIMARY KEY 
-            (
-                {pabsht},
-                {fht} 
-            )
-        )
-        """.format(
+              {ctime} TEXT NOT NULL,
+              {mtime} TEXT NOT NULL,
+              {fsize} INTEGER NOT NULL,
+
+              PRIMARY KEY
+              (
+                  {prooth},
+                  {prelh},
+                  {fnameh}
+              )
+          )
+          """.format(
             tbl=self.table_name(),
-            fht=PublicDataBase.PublicIndexTableColumnNames.file_hash_tag.value,
-            pabsht=PublicDataBase.PublicIndexTableColumnNames.absolute_path_hash_tag.value,
-            prelht=PublicDataBase.PublicIndexTableColumnNames.relative_path_hash_tag.value,
-            fext=PublicDataBase.PublicIndexTableColumnNames.file_extension.value,
-            fsize=PublicDataBase.PublicIndexTableColumnNames.file_size_kb.value,
+
+            prooth=PublicDataBase.PublicIndexTableColumnNames.root_path_hash_tag.value,
+            prelh=PublicDataBase.PublicIndexTableColumnNames.relative_path_hash_tag.value,
+            fnameh=PublicDataBase.PublicIndexTableColumnNames.filename_hash_tag.value,
+            pabsfnameh=PublicDataBase.PublicIndexTableColumnNames.absolute_file_path_hash_tag.value,
+            fconth=PublicDataBase.PublicIndexTableColumnNames.file_content_hash_tag.value,
+
+            ctime=PublicDataBase.PublicIndexTableColumnNames.creation_time.value,
             mtime=PublicDataBase.PublicIndexTableColumnNames.last_modification_time.value,
-            ctime=PublicDataBase.PublicIndexTableColumnNames.creation_time.value)
+            fsize=PublicDataBase.PublicIndexTableColumnNames.file_size.value
+        )
         self.cursor().execute(q)
 
 
@@ -267,8 +313,7 @@ class DataBaseIndexHelper(IndexDataBases):
         """
         print("Storing data sets to private database ...")
         if len(files) > 0:
-            for file in files:
-                self._insert_file_in_private_table(file)
+            self._insert_files_in_private_table(files)
 
             print("Storing data sets to public database ...")
 
@@ -276,26 +321,30 @@ class DataBaseIndexHelper(IndexDataBases):
             INSERT INTO 
                 {pub_tbl}
             SELECT 
-                {fht},
-                {pabsht},
-                {rpht},
-                {fext},
-                {fsize},
+                {prooth},
+                {prelh},
+                {fnameh},
+                {pabsfnameh},
+                {fconth},
+                {ctime},
                 {mtime},
-                {ctime}
+                {fsize}
             FROM
                 {priv_tbl} 
             """.format(
                 pub_tbl="public.{}".format(self.public_db.table_name()),
-                fht=PrivateDataBase.PrivateIndexTableColumnNames.file_hash_tag.value,
-                pabsht=PrivateDataBase.PrivateIndexTableColumnNames.absolute_path_hash_tag.value,
-                rpht=PrivateDataBase.PrivateIndexTableColumnNames.relative_path_hash_tag.value,
-                fext=PrivateDataBase.PrivateIndexTableColumnNames.file_extension.value,
-                fsize=PrivateDataBase.PrivateIndexTableColumnNames.file_size_kb.value,
-                mtime=PrivateDataBase.PrivateIndexTableColumnNames.last_modification_time.value,
-                ctime=PrivateDataBase.PrivateIndexTableColumnNames.creation_time.value,
+
+                prooth=PublicDataBase.PublicIndexTableColumnNames.root_path_hash_tag.value,
+                prelh=PublicDataBase.PublicIndexTableColumnNames.relative_path_hash_tag.value,
+                fnameh=PublicDataBase.PublicIndexTableColumnNames.filename_hash_tag.value,
+                pabsfnameh=PublicDataBase.PublicIndexTableColumnNames.absolute_file_path_hash_tag.value,
+                fconth=PublicDataBase.PublicIndexTableColumnNames.file_content_hash_tag.value,
+
+                ctime=PublicDataBase.PublicIndexTableColumnNames.creation_time.value,
+                mtime=PublicDataBase.PublicIndexTableColumnNames.last_modification_time.value,
+                fsize=PublicDataBase.PublicIndexTableColumnNames.file_size.value,
+
                 priv_tbl=self.private_db.table_name())
-            print(q)
             self.private_db.connection().execute(q)
 
         print("Storing data to database done.")
@@ -305,17 +354,37 @@ class DataBaseIndexHelper(IndexDataBases):
     def _insert_file_in_private_table(self, file: FileType):
         if file is None:
             return
+        q = """
+        INSERT INTO 
+            {tbl}
+        VALUES 
+            {values}
+        """.format(tbl=self.private_db.table_name(),
+                   values=convert_file_type_to_sql_entry(file))
         try:
-            q = """
-                INSERT INTO 
-                    {tbl}
-                VALUES 
-                    {values}
-            """.format(tbl=self.private_db.table_name(),
-                       values=convert_file_type_to_sql_entry(file))
             self.private_db.cursor().execute(q)
         except sqlite3.Error as e:
+            print(q)
             print(convert_file_type_to_sql_entry(file))
+            raise e
+        except object:
+            assert False
+
+    ##################################################################################################
+
+    def _insert_files_in_private_table(self, files: List[FileType]) -> None:
+        if files is None:
+            return
+        q = """
+        INSERT INTO 
+            {tbl}
+        VALUES 
+            (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """.format(tbl=self.private_db.table_name())
+        try:
+            self.private_db.cursor().executemany(q, convert_file_type_list_to_tuple_list(files))
+        except sqlite3.Error as e:
+            print(q)
             raise e
         except object:
             assert False

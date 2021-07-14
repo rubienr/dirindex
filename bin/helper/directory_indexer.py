@@ -6,6 +6,7 @@ import sys
 from datetime import datetime, timedelta
 from timeit import default_timer as timer
 from typing import List
+from magic import Magic
 
 from .database_helper import DataBaseIndexHelper
 from .file_type import FileType
@@ -142,35 +143,32 @@ class DirectoryIndexer:
 def _generate_file_information(root_directory: str, relative_directory: str, file_name: str,
                                hash_file_name_block_size: int,
                                hash_file_block_size: int):
-    """
-    Helper function that creates a FileType object, fills in all the fields and inserts that object in the
-    indexed files list.
-    :param root_directory: absolute path to the root directory (current directory being indexed)
-    :param relative_directory: relative path of the file (from the root_directory)
-    :param file_name: file name with extension
-    :param hash_file_name_block_size:
-    :param hash_file_block_size::
-    :return:
-    """
-
     folder_absolute_path = os.path.join(root_directory, relative_directory)
-    file_absolute_path = os.path.join(folder_absolute_path, file_name)
+    file_absoute_path = os.path.join(folder_absolute_path, file_name)
 
-    file_size_kb = os.stat(file_absolute_path).st_size
-    creation_time = datetime.fromtimestamp(
-        os.stat(file_absolute_path).st_ctime).strftime('%Y-%m-%d-%H:%M:%S')
-    last_mod_time = datetime.fromtimestamp(
-        os.stat(file_absolute_path).st_mtime).strftime('%Y-%m-%d-%H:%M:%S')
+    # fbasename = file_name.split('.')[0],
+    fext = ["" if len(fext) <= 1 else fext[-1] for fext in [file_name.split('.')]][0]
+    fmime = Magic(mime=True).from_file(file_absoute_path)
+    file_size_bytes = os.stat(file_absoute_path).st_size
+    ctime = datetime.fromtimestamp(
+        os.stat(file_absoute_path).st_ctime).strftime('%Y-%m-%d-%H:%M:%S')
+    mtime = datetime.fromtimestamp(
+        os.stat(file_absoute_path).st_mtime).strftime('%Y-%m-%d-%H:%M:%S')
 
     return FileType(
-        absolute_path=root_directory,
-        absolute_path_hash_tag=calculate_hash(file_absolute_path, hash_file_name_block_size, hash_content=False),
-        relative_path_hash_tag=calculate_hash(relative_directory, hash_file_name_block_size, hash_content=False),
+        root_path=root_directory,
         relative_path=relative_directory,
-        filename=file_name.split('.')[0],
-        file_extension=file_name.split('.')[-1],
-        hash_tag=calculate_hash(file_absolute_path, hash_file_block_size, hash_content=True),
-        file_size=file_size_kb / 1000.0,
-        creation_time=creation_time,
-        last_modified_time=last_mod_time
+        filename=file_name,
+        file_extension=fext,
+        file_mime_type=fmime,
+
+        root_path_hash_tag=calculate_hash(root_directory, hash_file_name_block_size, hash_content=False),
+        relative_path_hash_tag=calculate_hash(relative_directory, hash_file_name_block_size, hash_content=False),
+        filename_hash_tag=calculate_hash(file_name, hash_file_name_block_size, hash_content=False),
+        absolute_file_path_hash_tag=calculate_hash(file_absoute_path, hash_file_name_block_size, hash_content=False),
+        file_content_hash_tag=calculate_hash(file_absoute_path, hash_file_block_size, hash_content=True),
+
+        creation_time=ctime,
+        last_modification_time=mtime,
+        file_size=file_size_bytes
     )
