@@ -9,10 +9,11 @@ from typing import List
 
 from .database_helper import DataBaseIndexHelper
 from .file_type import FileType
-##################################################################################################
 from .hashing_config_mixin import HashingConfigMixin
 from .path_config_mixin import PathConfigMixin
 
+
+##################################################################################################
 
 def calculate_hash(file_path: str, block_size: int = 10240, hash_content=True):
     """
@@ -98,7 +99,7 @@ class DirectoryIndexer:
         num_total_processed_files = 0
         num_total_folders = 0
 
-        with concurrent.futures.ProcessPoolExecutor(max_workers=1) as executor:
+        with concurrent.futures.ProcessPoolExecutor() as executor:
             for root_directory in self._directory_list:
                 fs = []
                 num_processed_files = 0
