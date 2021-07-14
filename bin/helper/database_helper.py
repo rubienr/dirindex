@@ -195,7 +195,11 @@ class PrivateDataBase(IndexDataBaseHelper):
             mtime=PrivateDataBase.PrivateIndexTableColumnNames.last_modification_time.value,
             fsize=PrivateDataBase.PrivateIndexTableColumnNames.file_size.value
         )
-        self.cursor().execute(q)
+        try:
+            self.cursor().execute(q)
+        except BaseException as e:
+            print(q)
+            raise e
 
 
 ##################################################################################################
@@ -263,7 +267,12 @@ class PublicDataBase(IndexDataBaseHelper):
             mtime=PublicDataBase.PublicIndexTableColumnNames.last_modification_time.value,
             fsize=PublicDataBase.PublicIndexTableColumnNames.file_size.value
         )
-        self.cursor().execute(q)
+
+        try:
+            self.cursor().execute(q)
+        except BaseException as e:
+            print(q)
+            raise e
 
 
 ##################################################################################################
@@ -345,7 +354,12 @@ class DataBaseIndexHelper(IndexDataBases):
                 fsize=PublicDataBase.PublicIndexTableColumnNames.file_size.value,
 
                 priv_tbl=self.private_db.table_name())
-            self.private_db.connection().execute(q)
+
+            try:
+                self.private_db.connection().execute(q)
+            except BaseException as e:
+                print(q)
+                raise e
 
         print("Storing data to database done.")
 
@@ -367,7 +381,8 @@ class DataBaseIndexHelper(IndexDataBases):
             print(q)
             print(convert_file_type_to_sql_entry(file))
             raise e
-        except object:
+        except BaseException as e:
+            print(e)
             assert False
 
     ##################################################################################################
@@ -386,7 +401,8 @@ class DataBaseIndexHelper(IndexDataBases):
         except sqlite3.Error as e:
             print(q)
             raise e
-        except object:
+        except BaseException as e:
+            print(e)
             assert False
 
     ##################################################################################################
@@ -494,9 +510,14 @@ class UniqueFileFolderEvaluator(object):
             {cnt} INTEGER NOT NULL
         )
         """.format(tbl=UniqueFileFolderEvaluator.UNIQUE_FILES_TABLE_NAME,
-                   fht=PublicDataBase.PublicIndexTableColumnNames.file_hash_tag.value,
+                   fht=PublicDataBase.PublicIndexTableColumnNames.file_content_hash_tag.value,
                    cnt="cnt")
-        self.evaluation_db.cursor().execute(q)
+
+        try:
+            self.evaluation_db.cursor().execute(q)
+        except BaseException as e:
+            print(q)
+            raise e
 
     ##################################################################################################
 
@@ -512,10 +533,15 @@ class UniqueFileFolderEvaluator(object):
             {file_hash_tag}
         """.format(
             unique_files_tbl=UniqueFileFolderEvaluator.UNIQUE_FILES_TABLE_NAME,
-            file_hash_tag=PrivateDataBase.PrivateIndexTableColumnNames.file_hash_tag.value,
+            file_hash_tag=PrivateDataBase.PrivateIndexTableColumnNames.file_content_hash_tag.value,
             cnt="cnt",
             pub_index_tbl="index_db.{}".format(self.index_db.table_name()))
-        self.evaluation_db.cursor().execute(q)
+
+        try:
+            self.evaluation_db.cursor().execute(q)
+        except BaseException as e:
+            print(q)
+            raise e
 
     ##################################################################################################
 
@@ -530,7 +556,11 @@ class UniqueFileFolderEvaluator(object):
             tbl=UniqueFileFolderEvaluator.UNIQUE_FOLDERS_TABLE_NAME,
             rpth=PublicDataBase.PublicIndexTableColumnNames.relative_path_hash_tag.value,
             cnt="cnt")
-        self.evaluation_db.cursor().execute(q)
+        try:
+            self.evaluation_db.cursor().execute(q)
+        except BaseException as e:
+            print(q)
+            raise e
 
     ##################################################################################################
 
@@ -548,7 +578,11 @@ class UniqueFileFolderEvaluator(object):
             unique_unique_folders_tbl=UniqueFileFolderEvaluator.UNIQUE_FOLDERS_TABLE_NAME,
             path_hash_tag=PrivateDataBase.PrivateIndexTableColumnNames.relative_path_hash_tag.value,
             pub_index_tbl="index_db.{}".format(self.index_db.table_name()))
-        self.evaluation_db.cursor().execute(q)
+        try:
+            self.evaluation_db.cursor().execute(q)
+        except BaseException as e:
+            print(q)
+            raise e
 
 
 ######################################################################################################
@@ -601,13 +635,13 @@ class ExpectedFolderStructureEvaluator(object):
             CREATE TABLE IF NOT EXISTS {tbl}
             (
                 {rpht} TEXT NOT NULL, 
-                {fht} TEXT NOT NULL, 
+                {fcntht} TEXT NOT NULL, 
                 {cnt} INTEGER NOT NULL
             )
             """.format(
                 tbl=ExpectedFolderStructureEvaluator.EXPECTED_FOLDER_STRUCTURE_TABLE_NAME,
                 rpht=PrivateDataBase.PrivateIndexTableColumnNames.relative_path_hash_tag.value,
-                fht=PrivateDataBase.PrivateIndexTableColumnNames.file_hash_tag.value,
+                fcntht=PrivateDataBase.PrivateIndexTableColumnNames.file_content_hash_tag.value,
                 cnt="cnt")
         )
 
@@ -618,22 +652,27 @@ class ExpectedFolderStructureEvaluator(object):
         INSERT INTO 
             {expected_folder_structure_table}
         SELECT  
-            DISTINCT rel_path_hash_tag, file_hash_tag, cnt 
+            DISTINCT {rpht}, {fcntht}, cnt 
         FROM
             (SELECT 
-                B.{rpht}, A.{fht}, A.{cnt}
+                index_tbl.{rpht}, unique_files_tbl.{fcntht}, unique_files_tbl.{cnt}
             FROM 
-                {unique_files_table} AS A
+                {unique_files_table} AS unique_files_tbl
             LEFT JOIN
-            {index_tbl} AS B ON A.file_hash_tag= B.file_hash_tag) 
+            {index_tbl} AS index_tbl ON unique_files_tbl.{fcntht} = index_tbl.{fcntht}) 
         """.format(
             expected_folder_structure_table=ExpectedFolderStructureEvaluator.EXPECTED_FOLDER_STRUCTURE_TABLE_NAME,
             rpht=PublicDataBase.PublicIndexTableColumnNames.relative_path_hash_tag.value,
-            fht=PublicDataBase.PublicIndexTableColumnNames.file_hash_tag.value,
+            fcntht=PublicDataBase.PublicIndexTableColumnNames.file_content_hash_tag.value,
             cnt="cnt",
             unique_files_table="unique_files",
             index_tbl="index_db.{}".format(self.index_db.table_name()))
-        self.evaluation_db.cursor().execute(q)
+
+        try:
+            self.evaluation_db.cursor().execute(q)
+        except BaseException as e:
+            print(q)
+            raise e
 
 
 ######################################################################################################
